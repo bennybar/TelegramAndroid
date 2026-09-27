@@ -101,6 +101,7 @@ public class ForkSettingsActivity extends BaseFragment {
     public static final int ID_HIDE_ALL_CHATS_TAB = 28;
     public static final int ID_DEFAULT_FOLDER = 29;
     public static final int ID_FOLDER_TABS_STYLE = 97;
+    public static final int ID_SWIPE_RIGHT_TO_READ = 200;
 
     public static final int ID_REPLACE_FORWARD = 30;
     public static final int ID_MENTION_BY_NAME = 31;
@@ -569,6 +570,8 @@ public class ForkSettingsActivity extends BaseFragment {
             .setChecked(pref("unmutedOnTop", false)).setMultiline(true));
         items.add(UItem.asButtonCheck(ID_OPEN_ARCHIVE_ON_PULL, LocaleController.getString(R.string.OpenArchiveOnPull), LocaleController.getString(R.string.OpenArchiveOnPullInfo))
             .setChecked(pref("openArchiveOnPull", true)).setMultiline(true));
+        items.add(UItem.asButtonCheck(ID_SWIPE_RIGHT_TO_READ, LocaleController.getString(R.string.MySwipeRightToRead), LocaleController.getString(R.string.MySwipeRightToReadInfo))
+            .setChecked(pref("swipeRightToRead", false)).setMultiline(true));
         items.add(UItem.asButtonCheck(ID_HIDE_STORIES_IN_ARCHIVE, LocaleController.getString(R.string.HideStoriesInArchive), LocaleController.getString(R.string.HideStoriesInArchiveInfo))
             .setChecked(pref("hideStoriesInArchive", false)).setMultiline(true));
         items.add(UItem.asButtonCheck(ID_DISABLE_THUMBS_IN_DIALOG_LIST, LocaleController.getString(R.string.DisableThumbsInDialogList), LocaleController.getString(R.string.DisableThumbsInDialogListInfo))
@@ -785,6 +788,8 @@ public class ForkSettingsActivity extends BaseFragment {
             MessagesController.getInstance(currentAccount).sortDialogs(null);
         } else if (id == ID_OPEN_ARCHIVE_ON_PULL) {
             toggle("openArchiveOnPull", item, view);
+        } else if (id == ID_SWIPE_RIGHT_TO_READ) {
+            toggle("swipeRightToRead", item, view);
         } else if (id == ID_HIDE_STORIES_IN_ARCHIVE) {
             toggle("hideStoriesInArchive", item, view);
         } else if (id == ID_DISABLE_THUMBS_IN_DIALOG_LIST) {

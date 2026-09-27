@@ -2198,6 +2198,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 setOverScrollMode(View.OVER_SCROLL_ALWAYS);
             }
             if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                if (!parentPage.itemTouchhelper.isIdle() && parentPage.itemTouchhelper.checkHorizontalSwipe(null, ItemTouchHelper.RIGHT) != 0) {
+                    parentPage.swipeController.swipeFolderBack = true;
+                    ViewHolder viewHolder = parentPage.swipeController.currentItemViewHolder;
+                    if (action == MotionEvent.ACTION_UP && viewHolder != null && viewHolder.itemView instanceof DialogCell) {
+                        markAsReadBySwipe(((DialogCell) viewHolder.itemView).getDialogId());
+                    }
+                }
                 if (!parentPage.itemTouchhelper.isIdle() && parentPage.swipeController.swipingFolder) {
                     parentPage.swipeController.swipeFolderBack = true;
                     if (parentPage.itemTouchhelper.checkHorizontalSwipe(null, ItemTouchHelper.LEFT) != 0) {
@@ -2452,7 +2459,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     swipeFolderBack = false;
                     swipingFolder = (canSwipeBack && !DialogObject.isFolderDialogId(dialogCell.getDialogId())) || (SharedConfig.archiveHidden && DialogObject.isFolderDialogId(dialogCell.getDialogId()));
                     dialogCell.setSliding(true);
-                    return makeMovementFlags(0, ItemTouchHelper.LEFT);
+                    boolean swipeRightToRead = MessagesController.getGlobalMainSettings().getBoolean("swipeRightToRead", false) && !DialogObject.isFolderDialogId(dialogId) && !ChatObject.isCommunity(currentAccount, dialogId);
+                    return makeMovementFlags(0, ItemTouchHelper.LEFT | (swipeRightToRead ? ItemTouchHelper.RIGHT : 0));
                 }
             }
             return 0;
@@ -2497,6 +2505,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
 
         @Override
         public void onSwiped(RecyclerView.ViewHolder viewHolder, int direction) {
+            if (viewHolder != null && direction == ItemTouchHelper.RIGHT) {
+                // Left-to-right is only ever mark-as-read; never fall through to the archive/delete flow.
+                markAsReadBySwipe(((DialogCell) viewHolder.itemView).getDialogId());
+                return;
+            }
             if (viewHolder != null) {
                 DialogCell dialogCell = (DialogCell) viewHolder.itemView;
                 long dialogId = dialogCell.getDialogId();
@@ -9698,6 +9711,13 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 performSelectedDialogsAction(peerIds, archive, true, false);
                 break;
             }
+        }
+    }
+
+    private void markAsReadBySwipe(long did) {
+        TLRPC.Dialog dialog = getMessagesController().dialogs_dict.get(did);
+        if (dialog != null && (dialog.unread_count > 0 || dialog.unread_mark || dialog.unread_mentions_count > 0)) {
+            markAsRead(did);
         }
     }
 
