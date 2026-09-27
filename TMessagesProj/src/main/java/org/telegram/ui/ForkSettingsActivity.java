@@ -724,6 +724,7 @@ public class ForkSettingsActivity extends BaseFragment {
         items.add(UItem.asSettingsCell(ID_EXPORT_SETTINGS, LocaleController.getString(R.string.ExportSettings), ""));
         items.add(UItem.asSettingsCell(ID_IMPORT_SETTINGS, LocaleController.getString(R.string.ImportSettings), ""));
         items.add(UItem.asShadow(null));
+        MySettings.filterItems(items);
     }
 
     private boolean toggle(String option, UItem item, View view) {

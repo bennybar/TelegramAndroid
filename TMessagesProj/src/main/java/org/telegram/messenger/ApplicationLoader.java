@@ -334,6 +334,7 @@ public class ApplicationLoader extends Application {
         }
 
         super.onCreate();
+        org.telegram.ui.MySettings.applyForcedPrefs(applicationContext);
 
         // AndroidUtilities must be initialized before FileLog
         final String helloWorld = AndroidUtilities.getHelloWorld();
