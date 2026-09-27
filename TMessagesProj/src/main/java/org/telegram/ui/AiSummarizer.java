@@ -63,7 +63,7 @@ public class AiSummarizer {
         public final long dialogId;
         public final int messageId;
 
-        Ref(long dialogId, int messageId) {
+        public Ref(long dialogId, int messageId) {
             this.dialogId = dialogId;
             this.messageId = messageId;
         }

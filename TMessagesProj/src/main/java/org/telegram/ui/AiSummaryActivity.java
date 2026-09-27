@@ -1,5 +1,6 @@
 package org.telegram.ui;
 
+import android.app.TimePickerDialog;
 import android.content.Context;
 import android.graphics.Typeface;
 import android.os.Bundle;
@@ -51,11 +52,47 @@ public class AiSummaryActivity extends BaseFragment {
     private static final int ID_LAST = 4;
     private static final int ID_KEY = 5;
     private static final int ID_MODEL = 6;
+    private static final int ID_DIGEST = 7;
+    private static final int ID_DIGEST_TIME = 8;
+    private static final int ID_DIGEST_NOW = 9;
 
-    // Last result, kept for the session so reopening the tab costs nothing.
-    private static String lastSummary;
-    private static ArrayList<AiSummarizer.Ref> lastRefs;
-    private static String lastTitle;
+    // Last result (from the tab or the morning digest), saved so reopening costs nothing.
+    public static void saveLast(String title, String summary, ArrayList<AiSummarizer.Ref> refs) {
+        StringBuilder refText = new StringBuilder();
+        for (AiSummarizer.Ref ref : refs) {
+            refText.append(ref.dialogId).append(':').append(ref.messageId).append(',');
+        }
+        AiSummarizer.prefs().edit().putString("lastTitle", title).putString("lastSummary", summary).putString("lastRefs", refText.toString()).apply();
+    }
+
+    public static BaseFragment lastResultFragment() {
+        String summary = AiSummarizer.prefs().getString("lastSummary", null);
+        if (summary == null) {
+            return null;
+        }
+        ArrayList<AiSummarizer.Ref> refs = new ArrayList<>();
+        for (String ref : AiSummarizer.prefs().getString("lastRefs", "").split(",")) {
+            int colon = ref.indexOf(':');
+            if (colon > 0) {
+                refs.add(new AiSummarizer.Ref(Long.parseLong(ref.substring(0, colon)), Integer.parseInt(ref.substring(colon + 1))));
+            }
+        }
+        return new ResultActivity(AiSummarizer.prefs().getString("lastTitle", ""), summary, refs);
+    }
+
+    // The chats chosen in this tab: the picked list, or unread chats with activity since `since`.
+    public static ArrayList<Long> chatsForSummary(int account, int since) {
+        if (!AiSummarizer.prefs().getBoolean("pickMode", false)) {
+            return AiSummarizer.unreadChats(account, since);
+        }
+        ArrayList<Long> chats = new ArrayList<>();
+        for (String did : AiSummarizer.prefs().getString("pickedChats", "").split(",")) {
+            if (!did.isEmpty()) {
+                chats.add(Long.parseLong(did));
+            }
+        }
+        return chats;
+    }
 
     private final ArrayList<Long> pickedChats = new ArrayList<>();
     private UniversalRecyclerView listView;
@@ -112,10 +149,19 @@ public class AiSummaryActivity extends BaseFragment {
         items.add(UItem.asShadow("Unread chats: private chats and groups with unread messages in the window, up to " + AiSummarizer.MAX_UNREAD_CHATS + ". Channels are skipped. Secret chats are never sent."));
 
         items.add(UItem.asButton(ID_SUMMARIZE, "Summarize").accent());
-        if (lastSummary != null) {
-            items.add(UItem.asButton(ID_LAST, "Last summary", lastTitle));
+        if (AiSummarizer.prefs().contains("lastSummary")) {
+            items.add(UItem.asButton(ID_LAST, "Last summary", AiSummarizer.prefs().getString("lastTitle", "")));
         }
         items.add(UItem.asShadow(null));
+
+        items.add(UItem.asHeader("Morning digest"));
+        items.add(UItem.asButtonCheck(ID_DIGEST, "Morning digest", "Every day, summarize the last 12 hours of the chats above into one notification.")
+            .setChecked(MyDigest.enabled()).setMultiline(true));
+        if (MyDigest.enabled()) {
+            items.add(UItem.asButton(ID_DIGEST_TIME, "Time", MyDigest.timeText()));
+            items.add(UItem.asButton(ID_DIGEST_NOW, "Send now"));
+        }
+        items.add(UItem.asShadow("Android may deliver it a few minutes late while the phone is asleep."));
 
         String key = AiSummarizer.prefs().getString("apiKey", "");
         items.add(UItem.asHeader("OpenAI"));
@@ -158,7 +204,29 @@ public class AiSummaryActivity extends BaseFragment {
                 return null;
             });
         } else if (item.id == ID_LAST) {
-            presentFragment(new ResultActivity(lastTitle, lastSummary, lastRefs));
+            BaseFragment last = lastResultFragment();
+            if (last != null) {
+                presentFragment(last);
+            }
+        } else if (item.id == ID_DIGEST) {
+            MyDigest.setEnabled(!MyDigest.enabled());
+            listView.adapter.update(true);
+        } else if (item.id == ID_DIGEST_TIME) {
+            new TimePickerDialog(getParentActivity(), (picker, hour, minute) -> {
+                MyDigest.setMinuteOfDay(hour * 60 + minute);
+                listView.adapter.update(true);
+            }, MyDigest.minuteOfDay() / 60, MyDigest.minuteOfDay() % 60, true).show();
+        } else if (item.id == ID_DIGEST_NOW) {
+            if (AiSummarizer.prefs().getString("apiKey", "").isEmpty()) {
+                BulletinFactory.of(this).createErrorBulletin("Set your OpenAI API key first.").show();
+                return;
+            }
+            BulletinFactory.of(this).createSimpleBulletin(R.raw.contacts_sync_on, "Preparing digest… it arrives as a notification.").show();
+            MyDigest.run(() -> {
+                if (listView != null) {
+                    listView.adapter.update(true);
+                }
+            });
         } else if (item.id == ID_SUMMARIZE) {
             startSummary();
         }
@@ -171,7 +239,7 @@ public class AiSummaryActivity extends BaseFragment {
         }
         int index = windowIndex();
         int since = ConnectionsManager.getInstance(currentAccount).getCurrentTime() - WINDOW_HOURS[index] * 3600;
-        ArrayList<Long> chats = pickMode() ? new ArrayList<>(pickedChats) : AiSummarizer.unreadChats(currentAccount, since);
+        ArrayList<Long> chats = chatsForSummary(currentAccount, since);
         if (chats.isEmpty()) {
             BulletinFactory.of(this).createErrorBulletin(pickMode() ? "Choose at least one chat." : "No unread chats in this window.").show();
             return;
@@ -210,14 +278,12 @@ public class AiSummaryActivity extends BaseFragment {
             @Override
             public void onDone(String summary) {
                 dismissProgress();
-                lastSummary = summary;
-                lastRefs = running == null ? new ArrayList<>() : running.refs;
-                lastTitle = title;
+                saveLast(title, summary, running == null ? new ArrayList<>() : running.refs);
                 running = null;
                 if (listView != null) {
                     listView.adapter.update(true);
                 }
-                presentFragment(new ResultActivity(lastTitle, lastSummary, lastRefs));
+                presentFragment(lastResultFragment());
             }
 
             @Override
