@@ -2219,7 +2219,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                                     toggleArchiveHidden(false, dialogCell);
                                 } else {
                                     TLRPC.Dialog dialog = getMessagesController().dialogs_dict.get(dialogId);
-                                    if (dialog != null) {
+                                    if (swipeLeftToReply(dialogId)) {
+                                        openChatForReply(dialogId);
+                                    } else if (dialog != null) {
                                         performSwipeAction(dialogId, dialog);
                                     }
                                 }
@@ -2459,10 +2461,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                         }
                     }
                     swipeFolderBack = false;
-                    swipingFolder = (canSwipeBack && !DialogObject.isFolderDialogId(dialogCell.getDialogId())) || (SharedConfig.archiveHidden && DialogObject.isFolderDialogId(dialogCell.getDialogId()));
+                    swipingFolder = ((canSwipeBack || swipeLeftToReply(dialogId)) && !DialogObject.isFolderDialogId(dialogCell.getDialogId())) || (SharedConfig.archiveHidden && DialogObject.isFolderDialogId(dialogCell.getDialogId()));
                     dialogCell.setSliding(true);
-                    boolean swipeRightToRead = MessagesController.getGlobalMainSettings().getBoolean("swipeRightToRead", false) && !DialogObject.isFolderDialogId(dialogId) && !ChatObject.isCommunity(currentAccount, dialogId);
-                    return makeMovementFlags(0, ItemTouchHelper.LEFT | (swipeRightToRead ? ItemTouchHelper.RIGHT : 0));
+                    return makeMovementFlags(0, ItemTouchHelper.LEFT | (customSwipes(dialogId) ? ItemTouchHelper.RIGHT : 0));
                 }
             }
             return 0;
@@ -9713,6 +9714,32 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                 performSelectedDialogsAction(peerIds, archive, true, false);
                 break;
             }
+        }
+    }
+
+    // Fork setting: left-to-right marks read, right-to-left opens the chat replying to its last message.
+    private boolean customSwipes(long did) {
+        return MessagesController.getGlobalMainSettings().getBoolean("swipeRightToRead", false) && !DialogObject.isFolderDialogId(did) && !ChatObject.isCommunity(currentAccount, did);
+    }
+
+    private boolean swipeLeftToReply(long did) {
+        return customSwipes(did) && !getMessagesController().isForum(did);
+    }
+
+    private void openChatForReply(long did) {
+        Bundle args = new Bundle();
+        if (DialogObject.isEncryptedDialog(did)) {
+            args.putInt("enc_id", DialogObject.getEncryptedChatId(did));
+        } else if (DialogObject.isUserDialog(did)) {
+            args.putLong("user_id", did);
+        } else {
+            args.putLong("chat_id", -did);
+        }
+        ChatActivity chatActivity = new ChatActivity(args);
+        ArrayList<MessageObject> lastMessages = getMessagesController().dialogMessage.get(did);
+        MessageObject last = lastMessages == null || lastMessages.isEmpty() ? null : lastMessages.get(0);
+        if (presentFragment(chatActivity) && last != null && !(last.messageOwner instanceof TLRPC.TL_messageService)) {
+            chatActivity.showFieldPanelForReply(last);
         }
     }
 
