@@ -2,6 +2,7 @@
 <resources>
     <string name="MyAiTab">AI</string>
     <string name="MyReconnecting">Reconnecting…</string>
-    <string name="MySwipeRightToRead">Swipe chats: read / reply</string>
-    <string name="MySwipeRightToReadInfo">Swipe a chat right to mark it as read, or left to open it and reply to the last message.</string>
+    <string name="MySwipeRightToRead">Swipe chats: read / AI catch-up</string>
+    <string name="MyCatchUp">Catch up</string>
+    <string name="MySwipeRightToReadInfo">Swipe a chat right to mark it as read, or left for an AI summary of its unread messages (or the last 24 hours).</string>
 </resources>

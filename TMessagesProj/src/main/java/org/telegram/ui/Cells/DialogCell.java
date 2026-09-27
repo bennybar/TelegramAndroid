@@ -157,7 +157,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     private RLottieDrawable lastDrawTranslationDrawable;
     private int lastDrawSwipeMessageStringId;
     public boolean swipeCanceled;
-    private static RLottieDrawable swipeReplyDrawable;
+    private static RLottieDrawable swipeCatchUpDrawable;
     public static final int SENT_STATE_NOTHING = -1;
     public static final int SENT_STATE_PROGRESS = 0;
     public static final int SENT_STATE_SENT = 1;
@@ -3928,15 +3928,15 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 translationDrawable = Theme.dialogs_swipeReadDrawable;
             } else if (translationX < 0 && currentDialogFolderId == 0 && !promoDialog && !isDialogCommunity()
                     && MessagesController.getGlobalMainSettings().getBoolean("swipeRightToRead", false)
-                    && !MessagesController.getInstance(currentAccount).isForum(currentDialogId)) {
+                    && !DialogObject.isEncryptedDialog(currentDialogId)) {
                 backgroundColor = Theme.getColor(Theme.key_chats_archiveBackground, resourcesProvider);
                 revealBackgroundColor = Theme.getColor(Theme.key_chats_archivePinBackground, resourcesProvider);
-                swipeMessage = getString(swipeMessageStringId = R.string.Reply);
-                if (swipeReplyDrawable == null) {
-                    swipeReplyDrawable = new RLottieDrawable(R.raw.tab_reply, dp(36), dp(36), false, null);
-                    swipeReplyDrawable.setColorFilter(new PorterDuffColorFilter(Color.WHITE, PorterDuff.Mode.SRC_IN));
+                swipeMessage = getString(swipeMessageStringId = R.string.MyCatchUp);
+                if (swipeCatchUpDrawable == null) {
+                    swipeCatchUpDrawable = new RLottieDrawable(R.raw.tab_article, dp(36), dp(36), false, null);
+                    swipeCatchUpDrawable.setColorFilter(new PorterDuffColorFilter(Color.WHITE, PorterDuff.Mode.SRC_IN));
                 }
-                translationDrawable = swipeReplyDrawable;
+                translationDrawable = swipeCatchUpDrawable;
             }
 
             if (swipeCanceled && lastDrawTranslationDrawable != null) {

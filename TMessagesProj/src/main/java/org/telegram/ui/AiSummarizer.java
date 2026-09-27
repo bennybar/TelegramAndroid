@@ -90,6 +90,7 @@ public class AiSummarizer {
     private final StringBuilder[] chatTexts;
     private volatile boolean cancelled;
     private int messageCount;
+    private int minMessageId;
 
     public AiSummarizer(int account, ArrayList<Long> dialogIds, int sinceDate, Callback callback) {
         this.account = account;
@@ -130,6 +131,11 @@ public class AiSummarizer {
         }
         TLRPC.Chat chat = controller.getChat(-did);
         return chat == null ? "Unknown" : chat.title;
+    }
+
+    // Only collect messages newer than this id (e.g. the chat's last read message).
+    public void setMinMessageId(int minMessageId) {
+        this.minMessageId = minMessageId;
     }
 
     public void start() {
@@ -183,7 +189,7 @@ public class AiSummarizer {
             ArrayList<String> lines = new ArrayList<>();
             for (TLRPC.Message message : res.messages) {
                 lastId = message.id;
-                if (message.date < sinceDate) {
+                if (message.date < sinceDate || message.id <= minMessageId) {
                     reachedStart = true;
                     break;
                 }

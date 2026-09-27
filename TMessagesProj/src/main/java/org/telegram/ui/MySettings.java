@@ -110,9 +110,17 @@ public class MySettings {
     }
 
     private static final int ID_GOOGLE_PUSH_RELAY = 201;
+    private static final int ID_CATCH_UP_MARKS_READ = 202;
 
     public static void filterItems(ArrayList<UItem> items) {
         addOwnItems(items);
+        for (int i = 0; i < items.size(); i++) {
+            if (items.get(i).id == ForkSettingsActivity.ID_SWIPE_RIGHT_TO_READ) {
+                items.add(i + 1, UItem.asButtonCheck(ID_CATCH_UP_MARKS_READ, "Catch-up marks chat as read", "After the right-to-left AI summary, mark the chat as read.")
+                    .setChecked(MyCatchUp.marksRead()).setMultiline(true));
+                break;
+            }
+        }
         items.removeIf(item -> item.id > 0 && HIDDEN.contains(item.id));
         // Drop sections left with nothing but a header.
         for (int i = items.size() - 2; i >= 0; i--) {
@@ -132,6 +140,11 @@ public class MySettings {
     }
 
     public static boolean onClick(BaseFragment fragment, UItem item, Runnable refresh) {
+        if (item.id == ID_CATCH_UP_MARKS_READ) {
+            MyCatchUp.setMarksRead(!MyCatchUp.marksRead());
+            refresh.run();
+            return true;
+        }
         if (item.id != ID_GOOGLE_PUSH_RELAY) {
             return false;
         }
