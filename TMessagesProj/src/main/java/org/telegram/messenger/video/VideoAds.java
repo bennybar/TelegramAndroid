@@ -193,6 +193,7 @@ public static VideoAds make(
     private int requestId;
     private boolean loading, loaded;
     private void load() {
+        if (true) return; // Fork: ads disabled
         if (loading || loaded) return;
 
         if (UserConfig.getInstance(currentAccount).isPremium() && MessagesController.getInstance(currentAccount).isSponsoredDisabled()) {
