@@ -2,6 +2,12 @@ package org.telegram.ui;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.Uri;
+
+import org.telegram.messenger.MyFcmDistributor;
+import org.telegram.messenger.forkgram.ForkDialogs;
+import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.Components.BulletinFactory;
 
 import org.telegram.ui.Components.UItem;
 import org.telegram.ui.Components.UniversalAdapter;
@@ -103,7 +109,10 @@ public class MySettings {
         editor.commit();
     }
 
+    private static final int ID_GOOGLE_PUSH_RELAY = 201;
+
     public static void filterItems(ArrayList<UItem> items) {
+        addOwnItems(items);
         items.removeIf(item -> item.id > 0 && HIDDEN.contains(item.id));
         // Drop sections left with nothing but a header.
         for (int i = items.size() - 2; i >= 0; i--) {
@@ -112,5 +121,37 @@ public class MySettings {
                 items.remove(i);
             }
         }
+    }
+
+    private static void addOwnItems(ArrayList<UItem> items) {
+        items.add(UItem.asHeader("Google push"));
+        String relay = MyFcmDistributor.relayUrl();
+        items.add(UItem.asSettingsCell(ID_GOOGLE_PUSH_RELAY, "Google push relay", relay.isEmpty() ? "Not set" : Uri.parse(relay).getHost()));
+        items.add(UItem.asShadow("Your own relay (gateway/cloudflare-worker) lets Tegram receive notifications through Google Play Services, without ntfy. "
+            + "After setting it, pick this app as the UnifiedPush distributor in Notifications and Sounds."));
+    }
+
+    public static boolean onClick(BaseFragment fragment, UItem item, Runnable refresh) {
+        if (item.id != ID_GOOGLE_PUSH_RELAY) {
+            return false;
+        }
+        ForkDialogs.createFieldAlert(fragment.getParentActivity(), "Relay URL", MyFcmDistributor.relayUrl(), url -> {
+            if (!url.trim().isEmpty() && !url.trim().startsWith("https://")) {
+                BulletinFactory.of(fragment).createErrorBulletin("The relay URL must start with https://").show();
+                return null;
+            }
+            if (url.trim().isEmpty()) {
+                MyFcmDistributor.setConfig("", "");
+                refresh.run();
+                return null;
+            }
+            ForkDialogs.createFieldAlert(fragment.getParentActivity(), "Relay VAPID public key", MyFcmDistributor.vapidKey(), key -> {
+                MyFcmDistributor.setConfig(url, key);
+                refresh.run();
+                return null;
+            }, "The VAPID_PUBLIC_KEY printed when the relay was set up.");
+            return null;
+        }, "Your Cloudflare Worker address, e.g. https://tegram-push.you.workers.dev/ (leave empty to turn Google push off).");
+        return true;
     }
 }
