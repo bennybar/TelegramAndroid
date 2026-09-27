@@ -1730,6 +1730,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         boolean animateSwitchingSelector;
         UserListPoller poller;
         public int additionalPadding;
+        private final PullToReconnect pullToReconnect = new PullToReconnect();
 
         public DialogsRecyclerView(Context context, ViewPage page) {
             super(context);
@@ -2024,6 +2025,9 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         public boolean dispatchTouchEvent(MotionEvent ev) {
             if (ev.getAction() == MotionEvent.ACTION_DOWN && ev.getY() < (getPaddingTop() + scrollYOffset)) {
                 return false;
+            }
+            if (!onlySelect && parentPage.isDefaultDialogType()) {
+                pullToReconnect.onTouchEvent(this, ev, DialogsActivity.this);
             }
 
             return super.dispatchTouchEvent(ev);
