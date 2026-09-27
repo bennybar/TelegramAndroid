@@ -61,7 +61,8 @@ if [ "$built" != "$version" ]; then
     exit 1
 fi
 apk="$HOME/Downloads/ForkClient_$version.apk"
-cp TMessagesProj_App/build/outputs/apk/afat/release/app.apk "$apk"
+# With an injected ABI, AGP leaves the APK in intermediates instead of outputs.
+cp TMessagesProj_App/build/intermediates/apk/afat/release/app.apk "$apk"
 "$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner" verify "$apk"
 echo "==> APK: $apk"
 
