@@ -28,12 +28,13 @@ store="$(prop storeFile)"
 [[ "$store" = /* ]] || store="$(dirname "$KEYS")/$store"
 
 # Build number N = highest build already published for this upstream version + 1.
-# versionCode is APP_VERSION_CODE * 10 + N, so N must stay within 1..9.
+# APP_VERSION_CODE is passed as upstream code * 10, so versionCode is upstream code * 100 + N and N can go to 99.
 name=$(grep '^APP_VERSION_NAME=' gradle.properties | cut -d= -f2)
+code=$(grep '^APP_VERSION_CODE=' gradle.properties | cut -d= -f2)
 last=$(gh release list -R "$RELEASE_REPO" --limit 100 --json tagName --jq "[.[] | .tagName | select(startswith(\"$name.\")) | ltrimstr(\"$name.\") | tonumber] | max // 0")
 n=$((last + 1))
-if [ "$n" -gt 9 ]; then
-    echo "Already 9 releases for $name; wait for the next upstream version." >&2
+if [ "$n" -gt 99 ]; then
+    echo "Already 99 releases for $name; wait for the next upstream version." >&2
     exit 1
 fi
 version="$name.$n"
@@ -46,6 +47,7 @@ export ORG_GRADLE_PROJECT_RELEASE_KEYSTORE_FILE="$store"
 export ORG_GRADLE_PROJECT_RELEASE_STORE_PASSWORD="$(prop storePassword)"
 export ORG_GRADLE_PROJECT_RELEASE_KEY_ALIAS="$(prop keyAlias)"
 export ORG_GRADLE_PROJECT_RELEASE_KEY_PASSWORD="$(prop keyPassword)"
+export ORG_GRADLE_PROJECT_APP_VERSION_CODE="$((code * 10))"
 export ORG_GRADLE_PROJECT_ADDITIONAL_BUILD_NUMBER="$n"
 export ORG_GRADLE_PROJECT_USER_REPO="$RELEASE_REPO"
 export ORG_GRADLE_PROJECT_CHECK_UPDATES=1
