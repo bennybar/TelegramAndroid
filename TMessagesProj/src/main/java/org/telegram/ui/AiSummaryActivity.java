@@ -21,6 +21,7 @@ import android.widget.TextView;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.R;
+import org.telegram.messenger.Utilities;
 import org.telegram.messenger.forkgram.ForkDialogs;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.ui.ActionBar.ActionBar;
@@ -249,10 +250,84 @@ public class AiSummaryActivity extends BaseFragment {
         super.onFragmentDestroy();
     }
 
-    // Shows the summary; "## " lines are headings and [rN] references become links to the message.
-    public static class ResultActivity extends BaseFragment {
+    private static final Pattern REF = Pattern.compile("\\s*\\[r(\\d+)\\]");
 
-        private static final Pattern REF = Pattern.compile("\\s*\\[r(\\d+)\\]");
+    // Scrollable summary text: "## " lines are headings and [rN] references become ↗ links.
+    public static ScrollView summaryView(Context context, String summary, ArrayList<AiSummarizer.Ref> refs, Utilities.Callback<AiSummarizer.Ref> onRef) {
+        ScrollView scrollView = new ScrollView(context);
+        TextView textView = new TextView(context);
+        textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+        textView.setLineSpacing(AndroidUtilities.dp(3), 1f);
+        textView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+        textView.setLinkTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteLinkText));
+        textView.setPadding(AndroidUtilities.dp(18), AndroidUtilities.dp(14), AndroidUtilities.dp(18), AndroidUtilities.dp(24));
+        textView.setTextIsSelectable(true);
+        textView.setText(render(summary, refs, onRef));
+        textView.setMovementMethod(LinkMovementMethod.getInstance());
+        scrollView.addView(textView, LayoutHelper.createScroll(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP));
+        return scrollView;
+    }
+
+    private static CharSequence render(String text, ArrayList<AiSummarizer.Ref> refs, Utilities.Callback<AiSummarizer.Ref> onRef) {
+        SpannableStringBuilder out = new SpannableStringBuilder();
+        for (String rawLine : text.split("\n")) {
+            String line = rawLine.trim();
+            if (line.startsWith("## ")) {
+                if (out.length() > 0) {
+                    out.append('\n');
+                }
+                int start = out.length();
+                out.append(line.substring(3));
+                out.setSpan(new StyleSpan(Typeface.BOLD), start, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                out.setSpan(new RelativeSizeSpan(1.15f), start, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                out.append('\n');
+                continue;
+            }
+            if (line.startsWith("- ")) {
+                line = "• " + line.substring(2);
+            }
+            Matcher matcher = REF.matcher(line);
+            int last = 0;
+            while (matcher.find()) {
+                out.append(line, last, matcher.start());
+                int refIndex = Integer.parseInt(matcher.group(1)) - 1;
+                if (refIndex >= 0 && refIndex < refs.size()) {
+                    AiSummarizer.Ref ref = refs.get(refIndex);
+                    int start = out.length();
+                    out.append(" ↗");
+                    out.setSpan(new ClickableSpan() {
+                        @Override
+                        public void onClick(View widget) {
+                            onRef.run(ref);
+                        }
+
+                        @Override
+                        public void updateDrawState(TextPaint ds) {
+                            ds.setColor(Theme.getColor(Theme.key_windowBackgroundWhiteLinkText));
+                            ds.setUnderlineText(false);
+                        }
+                    }, start, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                }
+                last = matcher.end();
+            }
+            out.append(line, last, line.length()).append('\n');
+        }
+        return out;
+    }
+
+    public static void openMessage(BaseFragment fragment, AiSummarizer.Ref ref) {
+        Bundle args = new Bundle();
+        if (ref.dialogId > 0) {
+            args.putLong("user_id", ref.dialogId);
+        } else {
+            args.putLong("chat_id", -ref.dialogId);
+        }
+        args.putInt("message_id", ref.messageId);
+        fragment.presentFragment(new ChatActivity(args));
+    }
+
+    // Shows a summary full screen.
+    public static class ResultActivity extends BaseFragment {
 
         private final String title;
         private final String summary;
@@ -277,78 +352,9 @@ public class AiSummaryActivity extends BaseFragment {
                 }
             });
 
-            ScrollView scrollView = new ScrollView(context);
-            scrollView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
-            TextView textView = new TextView(context);
-            textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
-            textView.setLineSpacing(AndroidUtilities.dp(3), 1f);
-            textView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
-            textView.setLinkTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteLinkText));
-            textView.setPadding(AndroidUtilities.dp(18), AndroidUtilities.dp(14), AndroidUtilities.dp(18), AndroidUtilities.dp(24));
-            textView.setTextIsSelectable(true);
-            textView.setText(render(summary));
-            textView.setMovementMethod(LinkMovementMethod.getInstance());
-            scrollView.addView(textView, LayoutHelper.createScroll(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP));
-            fragmentView = scrollView;
+            fragmentView = summaryView(context, summary, refs, ref -> openMessage(this, ref));
+            fragmentView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
             return fragmentView;
-        }
-
-        private CharSequence render(String text) {
-            SpannableStringBuilder out = new SpannableStringBuilder();
-            for (String rawLine : text.split("\n")) {
-                String line = rawLine.trim();
-                if (line.startsWith("## ")) {
-                    if (out.length() > 0) {
-                        out.append('\n');
-                    }
-                    int start = out.length();
-                    out.append(line.substring(3));
-                    out.setSpan(new StyleSpan(Typeface.BOLD), start, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                    out.setSpan(new RelativeSizeSpan(1.15f), start, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                    out.append('\n');
-                    continue;
-                }
-                if (line.startsWith("- ")) {
-                    line = "• " + line.substring(2);
-                }
-                Matcher matcher = REF.matcher(line);
-                int last = 0;
-                while (matcher.find()) {
-                    out.append(line, last, matcher.start());
-                    int refIndex = Integer.parseInt(matcher.group(1)) - 1;
-                    if (refIndex >= 0 && refIndex < refs.size()) {
-                        AiSummarizer.Ref ref = refs.get(refIndex);
-                        int start = out.length();
-                        out.append(" ↗");
-                        out.setSpan(new ClickableSpan() {
-                            @Override
-                            public void onClick(View widget) {
-                                openMessage(ref);
-                            }
-
-                            @Override
-                            public void updateDrawState(TextPaint ds) {
-                                ds.setColor(Theme.getColor(Theme.key_windowBackgroundWhiteLinkText));
-                                ds.setUnderlineText(false);
-                            }
-                        }, start, out.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                    }
-                    last = matcher.end();
-                }
-                out.append(line, last, line.length()).append('\n');
-            }
-            return out;
-        }
-
-        private void openMessage(AiSummarizer.Ref ref) {
-            Bundle args = new Bundle();
-            if (ref.dialogId > 0) {
-                args.putLong("user_id", ref.dialogId);
-            } else {
-                args.putLong("chat_id", -ref.dialogId);
-            }
-            args.putInt("message_id", ref.messageId);
-            presentFragment(new ChatActivity(args));
         }
     }
 }
