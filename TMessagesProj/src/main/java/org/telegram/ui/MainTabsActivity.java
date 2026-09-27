@@ -354,6 +354,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             tabsView.addView(tabs[index]);
             tabsView.setViewVisible(view, true, false);
         }
+        MyAiTab.install(this, context, resourceProvider, tabsView, tabs[INDEX_SETTINGS], () -> selectTab(viewPager.getCurrentPosition(), false));
         checkUi_callTabVisible(getUserConfig().showCallsTab, false);
 
         selectTab(viewPager.getCurrentPosition(), false);

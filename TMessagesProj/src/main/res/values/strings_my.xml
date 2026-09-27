@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="MyAiTab">AI</string>
     <string name="MyReconnecting">Reconnecting…</string>
     <string name="MySwipeRightToRead">Swipe chats: read / reply</string>
     <string name="MySwipeRightToReadInfo">Swipe a chat right to mark it as read, or left to open it and reply to the last message.</string>
