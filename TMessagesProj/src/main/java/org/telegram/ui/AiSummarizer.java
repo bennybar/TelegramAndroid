@@ -41,7 +41,9 @@ public class AiSummarizer {
     private static final int CHUNK_CHARS = 60_000;
 
     private static final String SYSTEM_PROMPT =
-        "You summarize Telegram chats for the user, who appears as \"Me\". Write in English.\n" +
+        "You summarize Telegram chats for the user, who appears as \"Me\".\n" +
+        "Language: write each chat's section in the language that chat is mostly written in. " +
+        "Write the \"Needs you\" section, including its heading, in the language most of the input is written in.\n" +
         "Output plain text in exactly this shape:\n" +
         "## Needs you\n" +
         "- one bullet per thing that asks, mentions, or waits on Me (or a single bullet \"Nothing\")\n" +
