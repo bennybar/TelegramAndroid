@@ -11,5 +11,20 @@
         <meta-data
             android:name="android.telephony.PROPERTY_SATELLITE_DATA_OPTIMIZED"
             android:value="${applicationId}" />
+        <!-- Built-in Google push distributor: replace the library's receiver (public default relay)
+             with ours, which uses the relay set in Fork Client Settings. Disabled until configured. -->
+        <receiver
+            android:name="org.unifiedpush.android.embedded_fcm_distributor.impl.UnifiedPushReceiver"
+            tools:node="remove" />
+        <receiver
+            android:name="org.telegram.messenger.MyFcmDistributor"
+            android:enabled="false"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="org.unifiedpush.android.distributor.feature.BYTES_MESSAGE" />
+                <action android:name="org.unifiedpush.android.distributor.REGISTER" />
+                <action android:name="org.unifiedpush.android.distributor.UNREGISTER" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

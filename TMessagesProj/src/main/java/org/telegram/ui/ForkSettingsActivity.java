@@ -762,6 +762,9 @@ public class ForkSettingsActivity extends BaseFragment {
 
     private void onClick(UItem item, View view, int position, float x, float y) {
         final int id = item.id;
+        if (MySettings.onClick(this, item, () -> listView.adapter.update(false))) {
+            return;
+        }
 
         if (id == ID_HIDE_SENSITIVE_DATA) {
             toggle("hideSensitiveData", item, view);
