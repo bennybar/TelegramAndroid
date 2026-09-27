@@ -23729,6 +23729,7 @@ public class MessagesController extends BaseController implements NotificationCe
     }
 
     public boolean storiesEnabled() {
+        if (true) return false; // Fork: stories disabled
         switch (storiesPosting) {
             case "premium":
                 return getUserConfig().isPremium();

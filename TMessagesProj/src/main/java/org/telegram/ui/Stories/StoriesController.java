@@ -247,6 +247,7 @@ public class StoriesController {
     }
 
     public boolean hasStories(long dialogId) {
+        if (true) return false; // Fork: stories disabled
         if (dialogId == 0) {
             return false;
         }
@@ -280,10 +281,12 @@ public class StoriesController {
     }
 
     public boolean hasStories() {
+        if (true) return false; // Fork: stories disabled
         return (dialogListStories != null && dialogListStories.size() > 0) || hasSelfStories();
     }
 
     public void loadStories() {
+        if (true) return; // Fork: stories disabled
         if (firstLoad) {
             loadingFromDatabase = true;
             storiesStorage.getAllStories(allStories -> {
@@ -4276,6 +4279,7 @@ public class StoriesController {
     }
 
     public boolean hasOnlySelfStories() {
+        if (true) return false; // Fork: stories disabled
         return hasSelfStories() && (getDialogListStories().isEmpty() || (getDialogListStories().size() == 1 && DialogObject.getPeerDialogId(getDialogListStories().get(0).peer) == UserConfig.getInstance(currentAccount).clientUserId));
     }
 
