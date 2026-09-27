@@ -2199,6 +2199,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             }
             if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
                 if (!parentPage.itemTouchhelper.isIdle() && parentPage.itemTouchhelper.checkHorizontalSwipe(null, ItemTouchHelper.RIGHT) != 0) {
+                    // Both flags make getMovementFlags cancel the swipe, so the row bounces back (as for swipe actions like Read).
+                    parentPage.swipeController.swipingFolder = true;
                     parentPage.swipeController.swipeFolderBack = true;
                     ViewHolder viewHolder = parentPage.swipeController.currentItemViewHolder;
                     if (action == MotionEvent.ACTION_UP && viewHolder != null && viewHolder.itemView instanceof DialogCell) {

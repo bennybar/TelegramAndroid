@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="AppName">Tegram</string>
+    <string name="AppNameBeta">Tegram</string>
+    <!-- Also defined in TMessagesProj strings_my.xml (for R ids); the in-app string packer only reads files named strings.xml. -->
+    <string name="MyReconnecting">Reconnecting…</string>
+    <string name="MySwipeRightToRead">Swipe right to mark as read</string>
+    <string name="MySwipeRightToReadInfo">Swipe a chat from left to right to mark it as read.</string>
+</resources>
