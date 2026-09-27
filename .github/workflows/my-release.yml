@@ -2,10 +2,8 @@ name: My Release
 
 # Builds my-features and publishes the APK to the release repo.
 # The in-app updater (USER_REPO) picks up releases/latest from there.
+# Manual only; normal releases are built locally with scripts/release-local.sh.
 on:
-  push:
-    branches:
-      - my-features
   workflow_dispatch:
 
 env:
