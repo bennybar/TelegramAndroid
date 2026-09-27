@@ -4,6 +4,7 @@ import android.content.Context;
 import android.graphics.Typeface;
 import android.os.Bundle;
 import android.text.SpannableStringBuilder;
+import android.text.TextUtils;
 import android.text.Spanned;
 import android.text.TextPaint;
 import android.text.method.LinkMovementMethod;
@@ -59,6 +60,16 @@ public class AiSummaryActivity extends BaseFragment {
     private UniversalRecyclerView listView;
     private AiSummarizer running;
     private AlertDialog progressDialog;
+
+    @Override
+    public boolean onFragmentCreate() {
+        for (String did : AiSummarizer.prefs().getString("pickedChats", "").split(",")) {
+            if (!did.isEmpty()) {
+                pickedChats.add(Long.parseLong(did));
+            }
+        }
+        return super.onFragmentCreate();
+    }
 
     @Override
     public View createView(Context context) {
@@ -126,6 +137,7 @@ public class AiSummaryActivity extends BaseFragment {
                         pickedChats.add(did);
                     }
                 }
+                AiSummarizer.prefs().edit().putString("pickedChats", TextUtils.join(",", pickedChats)).apply();
                 listView.adapter.update(true);
             }, pickedChats);
             sheet.setSelectedContacts(pickedChats);
@@ -185,26 +197,13 @@ public class AiSummaryActivity extends BaseFragment {
 
             @Override
             public void onCollected(int chatCount, int messages, int approxTokens) {
-                dismissProgress();
                 if (messages == 0) {
+                    dismissProgress();
                     BulletinFactory.of(AiSummaryActivity.this).createErrorBulletin("No messages in this window.").show();
                     running = null;
                     return;
                 }
-                AiSummarizer summarizer = running;
-                AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
-                builder.setTitle("Send to OpenAI?");
-                builder.setMessage(messages + " messages from " + chatCount + (chatCount == 1 ? " chat" : " chats") +
-                    " (about " + approxTokens + " tokens). Their text will be sent to OpenAI using your key.");
-                builder.setPositiveButton("Summarize", (d, w) -> {
-                    progressDialog = new AlertDialog(getParentActivity(), AlertDialog.ALERT_TYPE_SPINNER);
-                    progressDialog.setCanCancel(true);
-                    progressDialog.setOnCancelListener(dd -> summarizer.cancel());
-                    progressDialog.show();
-                    summarizer.send();
-                });
-                builder.setNegativeButton("Cancel", (d, w) -> running = null);
-                showDialog(builder.create());
+                running.send();
             }
 
             @Override
