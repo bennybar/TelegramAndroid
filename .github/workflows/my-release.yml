@@ -1,0 +1,87 @@
+name: My Release
+
+# Builds my-features and publishes the APK to the release repo.
+# The in-app updater (USER_REPO) picks up releases/latest from there.
+on:
+  push:
+    branches:
+      - my-features
+  workflow_dispatch:
+
+env:
+  RELEASE_REPO: bennybar/congress_app_placeholder
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Free up some disk space.
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+        with:
+          tool-cache: false
+          android: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - uses: nttld/setup-ndk@v1.4.2
+        with:
+          ndk-version: r27c
+          link-to-sdk: true
+      - name: Install NDK for the JNI build (ndkVersion).
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.2.12479018"
+
+      - name: Pick version.
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          name=$(grep '^APP_VERSION_NAME=' gradle.properties | cut -d= -f2)
+          # Build number N = my releases already published for this upstream version + 1.
+          # versionCode is APP_VERSION_CODE * 10 + N, so N must stay within 1..9.
+          count=$(gh release list -R "$RELEASE_REPO" --limit 100 --json tagName --jq "[.[] | select(.tagName | startswith(\"$name.\"))] | length")
+          n=$((count + 1))
+          if [ "$n" -gt 9 ]; then
+            echo "Already 9 releases for $name; wait for the next upstream version." >&2
+            exit 1
+          fi
+          echo "BUILD_N=$n" >> $GITHUB_ENV
+          echo "VERSION=$name.$n" >> $GITHUB_ENV
+
+      - name: Build.
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > "$RUNNER_TEMP/release.jks"
+          vars=gradle.properties
+          echo "org.gradle.workers.max=1" >> $vars
+          echo "APP_ID=${{ secrets.APP_ID }}" >> $vars
+          echo "APP_HASH=${{ secrets.APP_HASH }}" >> $vars
+          echo "RELEASE_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> $vars
+          echo "RELEASE_STORE_PASSWORD=${{ secrets.KEYSTORE_PASS }}" >> $vars
+          echo "RELEASE_KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> $vars
+          echo "RELEASE_KEY_PASSWORD=${{ secrets.KEY_PASS }}" >> $vars
+          echo "ADDITIONAL_BUILD_NUMBER=$BUILD_N" >> $vars
+          echo "USER_REPO=$RELEASE_REPO" >> $vars
+          echo "CHECK_UPDATES=1" >> $vars
+
+          sudo apt update
+          sudo apt -y install ninja-build meson nasm gperf pkg-config unzip pip
+          rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+          ./gradlew :TMessagesProj_App:assembleAfatRelease
+
+          built=$(grep VERSION_NAME TMessagesProj/build/generated/source/buildConfig/release/org/telegram/messenger/BuildConfig.java | cut -d'"' -f 2)
+          if [ "$built" != "$VERSION" ]; then
+            echo "Built version $built does not match expected $VERSION" >&2
+            exit 1
+          fi
+          mv TMessagesProj_App/build/outputs/apk/afat/release/app.apk "ForkClient_$VERSION.apk"
+
+      - name: Publish release.
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          gh release create "$VERSION" "ForkClient_$VERSION.apk" \
+            -R "$RELEASE_REPO" \
+            --title "ForkClient $VERSION" \
+            --notes "Built from https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"

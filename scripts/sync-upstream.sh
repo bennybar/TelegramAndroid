@@ -17,7 +17,9 @@ git config rerere.enabled true
 git fetch upstream
 git checkout "$BRANCH"
 git rebase "$UPSTREAM"
-git submodule update --init --recursive
+git submodule update --init --depth 1 TMessagesProj_Modules/media TMessagesProj/lib/jlatexmath  # Java-side only; CI builds native
+# Pushing triggers .github/workflows/my-release.yml, which builds and publishes a new release.
+git push --force-with-lease origin "$BRANCH"
 
 echo "Done. My commits on top of $UPSTREAM:"
 git log --oneline "$UPSTREAM..HEAD"
