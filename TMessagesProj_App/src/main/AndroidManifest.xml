@@ -26,6 +26,7 @@
                 <action android:name="org.unifiedpush.android.distributor.UNREGISTER" />
             </intent-filter>
         </receiver>
+        <receiver android:name="org.telegram.ui.MyReminders$AlarmReceiver" android:exported="false" />
         <!-- Morning digest (org.telegram.ui.MyDigest) -->
         <receiver android:name="org.telegram.ui.MyDigest$AlarmReceiver" android:exported="false" />
         <service

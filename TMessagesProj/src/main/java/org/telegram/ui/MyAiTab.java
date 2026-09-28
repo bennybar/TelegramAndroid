@@ -13,7 +13,16 @@ import org.telegram.ui.Components.glass.GlassTabView;
 // switching pages, so upstream's tab positions stay untouched.
 public class MyAiTab {
 
-    public static void install(BaseFragment parent, Context context, Theme.ResourcesProvider resourcesProvider, MainTabsLayout tabsView, View settingsTab, Runnable restoreSelection) {
+    // Contacts page position in MainTabsActivity (Chats=0, Contacts=1, Calls/Settings=2, Profile=3).
+    private static final int CONTACTS_POSITION = 1;
+
+    // The Contacts tab is hidden (contacts stay reachable from the compose button), so swipes must not land on it.
+    public static boolean blocksSlide(int currentPosition, boolean forward) {
+        return forward ? currentPosition + 1 == CONTACTS_POSITION : currentPosition - 1 == CONTACTS_POSITION;
+    }
+
+    public static void install(BaseFragment parent, Context context, Theme.ResourcesProvider resourcesProvider, MainTabsLayout tabsView, View settingsTab, View contactsTab, Runnable restoreSelection) {
+        tabsView.setViewVisible(contactsTab, false, false);
         GlassTabView tab = GlassTabView.createMainTab(context, resourcesProvider, GlassTabView.TabAnimation.ARTICLE, R.string.MyAiTab);
         tab.setOnClickListener(v -> {
             parent.presentFragment(new AiSummaryActivity());

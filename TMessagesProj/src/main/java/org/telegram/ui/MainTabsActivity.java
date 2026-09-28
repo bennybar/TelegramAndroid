@@ -355,7 +355,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             tabsView.addView(tabs[index]);
             tabsView.setViewVisible(view, true, false);
         }
-        MyAiTab.install(this, context, resourceProvider, tabsView, tabs[INDEX_SETTINGS], () -> selectTab(viewPager.getCurrentPosition(), false));
+        MyAiTab.install(this, context, resourceProvider, tabsView, tabs[INDEX_SETTINGS], tabs[INDEX_CONTACTS], () -> selectTab(viewPager.getCurrentPosition(), false));
         checkUi_callTabVisible(getUserConfig().showCallsTab, false);
 
         selectTab(viewPager.getCurrentPosition(), false);
@@ -918,6 +918,9 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
     }
 
     private boolean canScrollInternal(MotionEvent ev, boolean forward) {
+        if (MyAiTab.blocksSlide(viewPager.getCurrentPosition(), forward)) {
+            return false;
+        }
         final BaseFragment fragment = getCurrentVisibleFragment();
         if (fragment instanceof TabFragmentDelegate) {
             final TabFragmentDelegate delegate = (TabFragmentDelegate) fragment;
