@@ -1,6 +1,9 @@
 package org.telegram.ui;
 
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.RectF;
+import android.text.Layout;
 import android.view.ViewGroup;
 
 import androidx.recyclerview.widget.RecyclerView;
@@ -19,6 +22,40 @@ public class MyChatListSize {
     private static final float[] SCALES = {0.9f, 1f, 1.05f, 1.1f, 1.15f};
     public static final String[] AVATAR_LABELS = {"80%", "90%", "100%", "110%", "120%"};
     private static final float[] AVATAR_SCALES = {0.8f, 0.9f, 1f, 1.1f, 1.2f};
+
+    public static boolean badgeOnPhoto() {
+        return MessagesController.getGlobalMainSettings().getBoolean("badgeOnPhoto", false);
+    }
+
+    private static Paint badgePaint;
+    private static Paint badgeRingPaint;
+    private static final RectF badgeRect = new RectF();
+
+    // DialogCell.drawCounter hook: the unread count as an app-icon style badge on the photo's top corner
+    // (top-right, or top-left in mirrored rows), with a ring in the background color.
+    public static void drawPhotoBadge(DialogCell cell, Canvas canvas, Layout countLayout, boolean muted) {
+        if (badgePaint == null) {
+            badgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            badgeRingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        }
+        float height = AndroidUtilities.dp(20);
+        float textWidth = countLayout.getLineWidth(0);
+        float width = Math.max(height, textWidth + AndroidUtilities.dp(12));
+        float top = cell.avatarImage.getImageY() - AndroidUtilities.dp(2);
+        float left = LocaleController.isRTL
+            ? cell.avatarImage.getImageX() - AndroidUtilities.dp(2)
+            : cell.avatarImage.getImageX2() + AndroidUtilities.dp(2) - width;
+        badgeRect.set(left, top, left + width, top + height);
+        float ring = AndroidUtilities.dp(2);
+        badgeRingPaint.setColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+        canvas.drawRoundRect(badgeRect.left - ring, badgeRect.top - ring, badgeRect.right + ring, badgeRect.bottom + ring, height / 2 + ring, height / 2 + ring, badgeRingPaint);
+        badgePaint.setColor(Theme.getColor(muted ? Theme.key_chats_unreadCounterMuted : Theme.key_chats_unreadCounter));
+        canvas.drawRoundRect(badgeRect, height / 2, height / 2, badgePaint);
+        canvas.save();
+        canvas.translate(badgeRect.centerX() - countLayout.getWidth() / 2f, badgeRect.centerY() - countLayout.getHeight() / 2f);
+        countLayout.draw(canvas);
+        canvas.restore();
+    }
 
     public static boolean dividers() {
         return MessagesController.getGlobalMainSettings().getBoolean("chatListDividers", false);
