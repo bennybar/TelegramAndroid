@@ -2353,7 +2353,19 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         if (drawNameLock) {
             nameWidth -= dp(LocaleController.isRTL ? 8 : 4) + Theme.dialogs_lockDrawable.getIntrinsicWidth();
         }
-        if (drawClock) {
+        if (MyChatListSize.ticksUnderTime() && (drawClock || drawCheck2)) {
+            // Read ticks / clock go under the time, in its column; the name keeps its full width.
+            final int timeRight = timeLeft + timeWidth;
+            if (!LocaleController.isRTL) {
+                clockDrawLeft = timeRight - Theme.dialogs_clockDrawable.getIntrinsicWidth();
+                checkDrawLeft1 = timeRight - Theme.dialogs_checkDrawable.getIntrinsicWidth();
+                halfCheckDrawLeft = timeRight - Theme.dialogs_halfCheckDrawable.getIntrinsicWidth();
+                checkDrawLeft = halfCheckDrawLeft - dp(5.5f);
+            } else {
+                clockDrawLeft = checkDrawLeft1 = checkDrawLeft = timeLeft;
+                halfCheckDrawLeft = checkDrawLeft + dp(5.5f);
+            }
+        } else if (drawClock) {
             int w = Theme.dialogs_clockDrawable.getIntrinsicWidth() + dp(5);
             nameWidth -= w;
             if (!LocaleController.isRTL) {
@@ -2752,6 +2764,11 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
 
         if (twoLinesForName) {
             messageTop += dp(20);
+        }
+        if (MyChatListSize.ticksUnderTime() && (drawClock || drawCheck2)) {
+            // Centered on the preview's first line (messageTop is final below, so add the line gap here too).
+            Paint.FontMetricsInt fm = Theme.dialogs_messagePaint[paintIndex].getFontMetricsInt();
+            checkDrawTop = messageTop + MyChatListSize.lineGapPx() + (fm.descent - fm.ascent - Theme.dialogs_checkDrawable.getIntrinsicHeight()) / 2;
         }
         final int myLineGap = MyChatListSize.lineGapPx(); // extra space between the name and the preview
         if (myLineGap != 0) {
