@@ -64,6 +64,34 @@ public class MyChatListSize {
         return params;
     }
 
+    public static final String[] ROW_LABELS = {"Default", "+4", "+8", "+12", "+16"};
+    private static final int[] ROW_EXTRA_DP = {0, 4, 8, 12, 16};
+
+    public static int rowIndex() {
+        int index = MessagesController.getGlobalMainSettings().getInt("chatListRowSpacing", 0);
+        return Math.max(0, Math.min(ROW_EXTRA_DP.length - 1, index));
+    }
+
+    public static void setRowIndex(int index) {
+        MessagesController.getGlobalMainSettings().edit().putInt("chatListRowSpacing", index).apply();
+    }
+
+    // Half of the extra row height: the content is drawn this much lower so it stays centered.
+    public static int rowShiftPx() {
+        return AndroidUtilities.dp(ROW_EXTRA_DP[rowIndex()] / 2f);
+    }
+
+    // DialogCell.onLayout hook: child views (e.g. the emoji status next to the name) move with the content.
+    public static void offsetChildren(ViewGroup cell) {
+        int shift = rowShiftPx();
+        if (shift == 0) {
+            return;
+        }
+        for (int i = 0; i < cell.getChildCount(); i++) {
+            cell.getChildAt(i).offsetTopAndBottom(shift);
+        }
+    }
+
     public static int avatarIndex() {
         int index = MessagesController.getGlobalMainSettings().getInt("chatListAvatarSize", 2);
         return Math.max(0, Math.min(AVATAR_SCALES.length - 1, index));
@@ -122,6 +150,9 @@ public class MyChatListSize {
         if (org.telegram.messenger.MyRtl.mirrorList()) {
             cell.messagePaddingStart += 6; // a little more room between the photo and the text in mirrored rows
         }
+        int rowExtra = ROW_EXTRA_DP[rowIndex()];
+        cell.heightDefault += rowExtra;
+        cell.heightThreeLines += rowExtra;
         float avatar = avatarScale();
         if (avatar != 1f) {
             // Text starts after the avatar: move it by the avatar's growth (56dp two-line avatar as reference).

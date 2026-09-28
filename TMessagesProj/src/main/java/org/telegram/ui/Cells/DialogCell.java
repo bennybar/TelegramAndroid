@@ -1103,6 +1103,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             }
             checkBox.layout(x, y, x + checkBox.getMeasuredWidth(), y + checkBox.getMeasuredHeight());
         }
+        MyChatListSize.offsetChildren(this); // right after the children are laid out, so it never accumulates
         int size = getMeasuredHeight() + getMeasuredWidth() << 16;
         if (size != lastSize || updateLayout) {
             updateLayout = false;
@@ -3838,6 +3839,9 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     @Override
     protected void onDraw(Canvas canvas) {
         final boolean myPrevRtl = org.telegram.messenger.MyRtl.beginMirror(); // mirrored chat list rows
+        final int myRowShift = MyChatListSize.rowShiftPx(); // row spacing: center the content in the taller row
+        canvas.save();
+        canvas.translate(0, myRowShift);
         try {
         if (currentDialogId == 0 && customDialog == null) {
             return;
@@ -4899,7 +4903,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 if (rightFragmentOpenedProgress != 0) {
                     Theme.dividerPaint.setAlpha((int) (alpha * (1f - rightFragmentOpenedProgress)));
                 }
-                float y = getMeasuredHeight() - 1 - rightFragmentOffset * rightFragmentOpenedProgress;
+                float y = getMeasuredHeight() - 1 - MyChatListSize.rowShiftPx() - rightFragmentOffset * rightFragmentOpenedProgress;
                 if (LocaleController.isRTL) {
                     canvas.drawLine(MyChatListSize.dividerEndInset(), y, getMeasuredWidth() - left, y, Theme.dividerPaint);
                 } else {
@@ -5028,6 +5032,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             invalidate();
         }
         } finally {
+            canvas.restore();
             org.telegram.messenger.MyRtl.endMirror(myPrevRtl);
         }
     }
