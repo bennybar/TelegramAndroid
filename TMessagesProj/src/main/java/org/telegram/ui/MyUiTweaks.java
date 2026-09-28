@@ -8,6 +8,7 @@ import android.graphics.drawable.ColorDrawable;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.TextView;
 
 import androidx.core.graphics.ColorUtils;
 
@@ -59,8 +60,10 @@ public class MyUiTweaks {
         return Theme.getColor(Theme.key_glass_tabSelected);
     }
 
+    // Neutral MD3 surface container: the background a few percent darker (lighter in dark themes), no accent cast.
     private static int surfaceContainer() {
-        return ColorUtils.blendARGB(Theme.getColor(Theme.key_windowBackgroundWhite), accent(), 0.06f);
+        int background = Theme.getColor(Theme.key_windowBackgroundWhite);
+        return ColorUtils.blendARGB(background, Theme.isCurrentThemeDark() ? 0xFFFFFFFF : 0xFF000000, Theme.isCurrentThemeDark() ? 0.07f : 0.04f);
     }
 
     // MainTabsActivity hook: a full-width tonal bar (MD3 surface container) instead of the floating glass pill.
@@ -71,18 +74,20 @@ public class MyUiTweaks {
         wrapper.setBackground(new ColorDrawable(surfaceContainer())); // wrapper padding already covers the nav bar area
         tabsView.setBackground(null);
         tabsView.setMaxWidth(Integer.MAX_VALUE);
-        tabsView.setPadding(0, AndroidUtilities.dp(4), 0, AndroidUtilities.dp(4));
+        tabsView.setPadding(0, 0, 0, 0);
+        // Icon-only bar: 56dp instead of the 72dp glass bar.
+        tabsView.getLayoutParams().height = AndroidUtilities.dp(56);
         fadeView.setBackground(null);
     }
 
-    // GlassTabView.createMainTab hook: MD3 layout, icon inside a 32dp-tall indicator and the label 4dp below it.
+    // GlassTabView.createMainTab hook: icon-only MD3 tab, the icon centered in its 32dp-tall indicator.
     public static void layoutMainTab(View tab, View icon, View label) {
         if (!md3TabBar()) {
             return;
         }
         mainTabs.add(tab);
-        icon.setLayoutParams(LayoutHelper.createFrame(24, 24, Gravity.CENTER_HORIZONTAL | Gravity.TOP, 0, 10, 0, 0));
-        label.setLayoutParams(LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.CENTER_HORIZONTAL | Gravity.TOP, 0, 41, 0, 0));
+        icon.setLayoutParams(LayoutHelper.createFrame(24, 24, Gravity.CENTER));
+        label.setVisibility(View.GONE);
     }
 
     // GlassTabView.dispatchDraw hook: MD3 active indicator (64x32 pill behind the icon, growing in on selection)
@@ -94,7 +99,7 @@ public class MyUiTweaks {
         if (indicatorPaint == null) {
             indicatorPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         }
-        int color = ColorUtils.blendARGB(Theme.getColor(Theme.key_windowBackgroundWhite), accent(), 0.22f);
+        int color = ColorUtils.blendARGB(surfaceContainer(), accent(), 0.16f);
         indicatorPaint.setColor(color);
         indicatorPaint.setAlpha((int) (Math.min(1f, selectedFactor * 1.5f) * 255));
         float cx = icon.getLeft() + icon.getWidth() / 2f;
@@ -110,6 +115,14 @@ public class MyUiTweaks {
 
     public static int searchFieldHeight() {
         return compactSearch() ? 40 : 48;
+    }
+
+    // DialogsActivity hook: EditText's built-in ~48dp minimum height would push the text off-center at 40dp.
+    public static void applyCompactSearch(TextView editText) {
+        if (compactSearch()) {
+            editText.setMinHeight(0);
+            editText.setMinimumHeight(0);
+        }
     }
 
     // ---- Tinted pinned chats ----

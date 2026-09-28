@@ -14,6 +14,7 @@ import android.text.style.RelativeSizeSpan;
 import android.text.style.StyleSpan;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.ScrollView;
@@ -41,7 +42,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 // "AI" bottom tab: summarize chats over a time window with the user's own OpenAI key.
-public class AiSummaryActivity extends BaseFragment {
+public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.TabFragmentDelegate {
 
     private static final String[] WINDOW_LABELS = {"8 hours", "1 day", "2 days", "3 days"};
     private static final int[] WINDOW_HOURS = {8, 24, 48, 72};
@@ -99,6 +100,22 @@ public class AiSummaryActivity extends BaseFragment {
     private AiSummarizer running;
     private AlertDialog progressDialog;
 
+    private boolean hasMainTabs;
+
+    public AiSummaryActivity() {
+        super();
+    }
+
+    public AiSummaryActivity(Bundle args) {
+        super(args);
+        hasMainTabs = args != null && args.getBoolean("hasMainTabs", false);
+    }
+
+    @Override
+    public boolean canParentTabsSlide(MotionEvent ev, boolean forward) {
+        return true;
+    }
+
     @Override
     public boolean onFragmentCreate() {
         for (String did : AiSummarizer.prefs().getString("pickedChats", "").split(",")) {
@@ -111,7 +128,9 @@ public class AiSummaryActivity extends BaseFragment {
 
     @Override
     public View createView(Context context) {
-        actionBar.setBackButtonImage(R.drawable.ic_ab_back);
+        if (!hasMainTabs) {
+            actionBar.setBackButtonImage(R.drawable.ic_ab_back);
+        }
         actionBar.setTitle("AI summary");
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
             @Override
@@ -125,6 +144,11 @@ public class AiSummaryActivity extends BaseFragment {
         FrameLayout frameLayout = new FrameLayout(context);
         frameLayout.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray));
         listView = new UniversalRecyclerView(this, this::fillItems, this::onClick, null);
+        if (hasMainTabs) {
+            // Keep the last rows clear of the bottom tab bar.
+            listView.setPadding(0, 0, 0, AndroidUtilities.dp(DialogsActivity.MAIN_TABS_HEIGHT_WITH_MARGINS) + AndroidUtilities.navigationBarHeight);
+            listView.setClipToPadding(false);
+        }
         frameLayout.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         fragmentView = frameLayout;
         return fragmentView;
