@@ -114,7 +114,6 @@ import org.telegram.ui.Components.Premium.PremiumGradient;
 import org.telegram.ui.Components.PullForegroundDrawable;
 import org.telegram.ui.Components.QuoteSpan;
 import org.telegram.ui.Components.RLottieDrawable;
-import org.telegram.ui.MyIMessageStyle;
 import org.telegram.ui.Components.Reactions.ReactionsLayoutInBubble;
 import org.telegram.ui.Components.StaticLayoutEx;
 import org.telegram.ui.Components.StatusDrawable;
@@ -721,7 +720,6 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         emojiStatus = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(emojiStatusView, dp(22));
         botVerification = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(this, dp(17));
         avatarImage.setAllowLoadingOnAttachedOnly(true);
-        MyIMessageStyle.applyToCell(this, fragment);
     }
 
     @Override
@@ -2302,11 +2300,10 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             timeWidth = (int) Math.ceil(tp.measureText(timeString));
             timeLayout = new StaticLayout(timeString, tp, timeWidth, Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
             timeWidth += dp(getIsPinned() ? 24 : 0);
-            timeWidth += MyIMessageStyle.timeShift(this);
             if (!LocaleController.isRTL) {
                 timeLeft = getMeasuredWidth() - dp(15) - timeWidth;
             } else {
-                timeLeft = dp(15) + MyIMessageStyle.timeShift(this);
+                timeLeft = dp(15);
             }
         } else {
             timeWidth = 0;
@@ -2548,10 +2545,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             if (countString != null) {
                 countWidth = Math.max(dp(BADGE_TEXT_MIN_WIDTH), (int) Math.ceil(Theme.dialogs_countTextPaint2.measureText(countString)));
                 countLayout = new StaticLayout(countString, Theme.dialogs_countTextPaint2, countWidth, Layout.Alignment.ALIGN_CENTER, 1.0f, 0.0f, false);
-                if (MyIMessageStyle.isStyled(this)) {
-                    countWidth = 0; // the unread dot sits left of the avatar, so no room is reserved here
-                }
-                int w = countWidth == 0 ? 0 : countWidth + dp(BADGE_GAP);
+                int w = countWidth + dp(BADGE_GAP);
                 messageWidth -= w;
                 if (!LocaleController.isRTL) {
                     countLeft = getMeasuredWidth() - dp(BADGE_MARGIN) - (countWidth + dp(BADGE_TEXT_PADDING * 2));
@@ -2691,7 +2685,6 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 }
             }
         }
-        messageWidth -= MyIMessageStyle.previewTrim(this);
         messageWidth = Math.max(dp(12), messageWidth);
         buttonTop = dp(useForceThreeLines || SharedConfig.useThreeLinesLayout ? 58 : 62);
         if ((!(useForceThreeLines || SharedConfig.useThreeLinesLayout) || isForumCell()) && hasTags()) {
@@ -4248,7 +4241,6 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 if (updateTextColor) {
                     timeLayout.getPaint().setColor(tpColor);
                 }
-                MyIMessageStyle.drawChevron(this, canvas, timeLayout, timeTextPaint);
                 canvas.restore();
             }
 
@@ -5313,12 +5305,6 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     }
 
     private void drawCounter(Canvas canvas, boolean drawCounterMuted, int countTop, int countLeftLocal, int countLeftOld, float globalScale, boolean outline) {
-        if (MyIMessageStyle.isStyled(this)) {
-            if (drawCount && drawCount2 && !outline) {
-                MyIMessageStyle.drawUnreadDot(this, canvas, drawCounterMuted);
-            }
-            return;
-        }
         final boolean drawBubble = isForumCell() || isFolderCell();
         if (drawCount && drawCount2 || countChangeProgress != 1f) {
             final float progressFinal = (unreadCount == 0 && !markUnread) ? 1f - countChangeProgress : countChangeProgress;

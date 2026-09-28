@@ -116,7 +116,6 @@ public class MySettings {
 
     private static final int ID_GOOGLE_PUSH_RELAY = 201;
     private static final int ID_CATCH_UP_MARKS_READ = 202;
-    private static final int ID_IMESSAGE_CHAT_LIST = 203;
     private static final int ID_DEVICE_FONT = 204;
 
     public static void filterItems(ArrayList<UItem> items) {
@@ -140,14 +139,12 @@ public class MySettings {
 
     private static void addOwnItems(ArrayList<UItem> items) {
         items.add(0, UItem.asHeader("Look"));
-        items.add(1, UItem.asButtonCheck(ID_IMESSAGE_CHAT_LIST, "iMessage-style chat list", "Blue unread dot instead of count badges, time with ›, two-line previews.")
-            .setChecked(MyIMessageStyle.enabled()).setMultiline(true));
-        int next = 2;
+        int next = 1;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             items.add(next++, UItem.asButtonCheck(ID_DEVICE_FONT, "Use device font", "Bold text (names, titles) uses your phone's font instead of Telegram's Roboto.")
                 .setChecked(SharedConfig.useSystemBoldFont).setMultiline(true));
         }
-        items.add(next, UItem.asShadow("Reopen Tegram after changing these."));
+        items.add(next, UItem.asShadow("Reopen Tegram after changing this."));
         items.add(UItem.asHeader("Google push"));
         String relay = MyFcmDistributor.relayUrl();
         items.add(UItem.asSettingsCell(ID_GOOGLE_PUSH_RELAY, "Google push relay", relay.isEmpty() ? "Not set" : Uri.parse(relay).getHost()));
@@ -158,12 +155,6 @@ public class MySettings {
     public static boolean onClick(BaseFragment fragment, UItem item, Runnable refresh) {
         if (item.id == ID_DEVICE_FONT) {
             SharedConfig.toggleUseSystemBoldFont();
-            refresh.run();
-            BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply.").show();
-            return true;
-        }
-        if (item.id == ID_IMESSAGE_CHAT_LIST) {
-            MyIMessageStyle.setEnabled(!MyIMessageStyle.enabled());
             refresh.run();
             BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply.").show();
             return true;
