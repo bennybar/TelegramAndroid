@@ -34116,6 +34116,10 @@ public class ChatActivity extends BaseFragment implements
         if (selectedObject == null || getParentActivity() == null) {
             return;
         }
+        if (MyReminders.handleOption(this, option, selectedObject)) {
+            closeMenu();
+            return;
+        }
         boolean preserveDim = false;
         switch (option) {
             case OPTION_RETRY: {
@@ -38846,6 +38850,7 @@ public class ChatActivity extends BaseFragment implements
                 } else if (view instanceof ChatUnreadCell) {
                     ChatUnreadCell unreadCell = (ChatUnreadCell) view;
                     unreadCell.setText(LocaleController.getString(R.string.UnreadMessages));
+                    MyCatchUp.bindUnreadCell(ChatActivity.this, unreadCell, dialog_id, messages, unreadMessageObject);
                     unreadCell.getTextView().setTranslationX(getSideMenuWidth() / 2f);
                     if (createUnreadMessageAfterId != 0) {
                         createUnreadMessageAfterId = 0;
@@ -47070,6 +47075,7 @@ public class ChatActivity extends BaseFragment implements
             options.add(OPTION_WELCOME_REVERT);
             icons.add(R.drawable.outline_revert_24);
         }
+        MyReminders.addMenuItem(selectedObject, icons, items, options);
     }
 
     private boolean showWelcomeMessageRevertOption(MessageObject messageObject) {

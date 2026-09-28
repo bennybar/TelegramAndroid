@@ -2,11 +2,17 @@ package org.telegram.ui;
 
 import android.app.Activity;
 
+import org.telegram.messenger.DialogObject;
+import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.R;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.AlertDialog;
+import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
+import org.telegram.ui.Cells.ChatUnreadCell;
 import org.telegram.ui.Components.BulletinFactory;
 
 import java.util.ArrayList;
@@ -22,7 +28,34 @@ public class MyCatchUp {
         AiSummarizer.prefs().edit().putBoolean("catchUpMarksRead", value).apply();
     }
 
-    public static void run(DialogsActivity fragment, long dialogId, Runnable markRead) {
+    // Chats list swipe: unread messages per the dialog's read state, or the last 24 hours.
+    public static void run(BaseFragment fragment, long dialogId, Runnable markRead) {
+        int account = fragment.getCurrentAccount();
+        TLRPC.Dialog dialog = MessagesController.getInstance(account).dialogs_dict.get(dialogId);
+        boolean unread = dialog != null && dialog.unread_count > 0;
+        int since = unread ? 0 : ConnectionsManager.getInstance(account).getCurrentTime() - 24 * 3600;
+        String title = AiSummarizer.chatTitle(account, dialogId) + " · " + (unread ? dialog.unread_count + " unread" : "last 24 hours");
+        start(fragment, dialogId, since, unread ? dialog.read_inbox_max_id : 0, title, markRead);
+    }
+
+    // ChatActivity hook: make the "Unread messages" divider offer a summary of everything below it.
+    public static void bindUnreadCell(ChatActivity chat, ChatUnreadCell cell, long dialogId, ArrayList<MessageObject> messages, MessageObject divider) {
+        if (DialogObject.isEncryptedDialog(dialogId) || AiSummarizer.prefs().getString("apiKey", "").isEmpty()) {
+            cell.setOnClickListener(null);
+            cell.setClickable(false);
+            return;
+        }
+        cell.setText(LocaleController.getString(R.string.UnreadMessages) + "  ·  ✦ Summarize");
+        cell.setOnClickListener(v -> {
+            // The divider sits just above the first unread message; the list is newest first.
+            int index = messages.indexOf(divider);
+            int lastReadId = index >= 0 && index + 1 < messages.size() ? messages.get(index + 1).getId() : 0;
+            String title = AiSummarizer.chatTitle(chat.getCurrentAccount(), dialogId) + " · unread";
+            start(chat, dialogId, 0, lastReadId, title, null);
+        });
+    }
+
+    private static void start(BaseFragment fragment, long dialogId, int since, int minMessageId, String title, Runnable markRead) {
         Activity activity = fragment.getParentActivity();
         if (activity == null) {
             return;
@@ -32,10 +65,6 @@ public class MyCatchUp {
             return;
         }
         int account = fragment.getCurrentAccount();
-        TLRPC.Dialog dialog = MessagesController.getInstance(account).dialogs_dict.get(dialogId);
-        boolean unread = dialog != null && dialog.unread_count > 0;
-        int since = unread ? 0 : ConnectionsManager.getInstance(account).getCurrentTime() - 24 * 3600;
-        String title = AiSummarizer.chatTitle(account, dialogId) + " · " + (unread ? dialog.unread_count + " unread" : "last 24 hours");
 
         AlertDialog progress = new AlertDialog(activity, AlertDialog.ALERT_TYPE_SPINNER);
         progress.setCanCancel(true);
@@ -74,7 +103,7 @@ public class MyCatchUp {
                 }));
                 sheet[0] = builder.create();
                 fragment.showDialog(sheet[0]);
-                if (marksRead()) {
+                if (markRead != null && marksRead()) {
                     markRead.run();
                 }
             }
@@ -89,9 +118,7 @@ public class MyCatchUp {
                 fragment.showDialog(builder.create());
             }
         });
-        if (unread) {
-            summarizer[0].setMinMessageId(dialog.read_inbox_max_id);
-        }
+        summarizer[0].setMinMessageId(minMessageId);
         progress.show();
         summarizer[0].start();
     }
