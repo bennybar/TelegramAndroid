@@ -128,6 +128,7 @@ public class MySettings {
     private static final int ID_DOUBLE_TAP_REPLY = 212;
     private static final int ID_PREFER_RTL = 213;
     private static final int ID_MIRROR_LIST = 214;
+    private static final int ID_BADGE_ON_PHOTO = 215;
 
     public static void filterItems(ArrayList<UItem> items) {
         addOwnItems(items);
@@ -175,6 +176,8 @@ public class MySettings {
         items.add(next++, UItem.asShadow(null));
         items.add(next++, UItem.asButtonCheck(ID_DIVIDERS, "List dividers", "A thin line between chats, with the same margin on both sides.")
             .setChecked(MyChatListSize.dividers()).setMultiline(true));
+        items.add(next++, UItem.asButtonCheck(ID_BADGE_ON_PHOTO, "Unread count on photo", "The unread count sits on the photo's top corner, like app icon badges.")
+            .setChecked(MyChatListSize.badgeOnPhoto()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_PINNED_TINT, "Tint pinned chats", "A faint accent background on pinned chats instead of the pin next to the time.")
             .setChecked(MyUiTweaks.pinnedTint()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_COMPACT_SEARCH, "Compact search bar", "A slimmer search field above the chat list.")
@@ -203,6 +206,12 @@ public class MySettings {
     }
 
     public static boolean onClick(BaseFragment fragment, UItem item, Runnable refresh) {
+        if (item.id == ID_BADGE_ON_PHOTO) {
+            MyChatListSize.toggle("badgeOnPhoto");
+            refresh.run();
+            BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply.").show();
+            return true;
+        }
         if (item.id == ID_MIRROR_LIST) {
             MyRtl.toggleMirrorList();
             refresh.run();
