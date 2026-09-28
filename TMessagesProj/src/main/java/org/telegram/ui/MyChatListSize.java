@@ -31,9 +31,29 @@ public class MyChatListSize {
     private static Paint badgeRingPaint;
     private static final RectF badgeRect = new RectF();
 
-    // DialogCell.drawCounter hook: the unread count as an app-icon style badge on the photo's top corner
+    // The counter is drawn before the photo, so drawCounter only records the badge and it is drawn right after the photo.
+    private static DialogCell pendingCell;
+    private static Layout pendingLayout;
+    private static boolean pendingMuted;
+
+    public static void setPendingPhotoBadge(DialogCell cell, Layout countLayout, boolean muted) {
+        pendingCell = cell;
+        pendingLayout = countLayout;
+        pendingMuted = muted;
+    }
+
+    public static void drawPendingPhotoBadge(DialogCell cell, Canvas canvas) {
+        if (pendingCell != cell || pendingLayout == null) {
+            return;
+        }
+        drawPhotoBadge(cell, canvas, pendingLayout, pendingMuted);
+        pendingCell = null;
+        pendingLayout = null;
+    }
+
+    // The unread count as an app-icon style badge on the photo's top corner
     // (top-right, or top-left in mirrored rows), with a ring in the background color.
-    public static void drawPhotoBadge(DialogCell cell, Canvas canvas, Layout countLayout, boolean muted) {
+    private static void drawPhotoBadge(DialogCell cell, Canvas canvas, Layout countLayout, boolean muted) {
         if (badgePaint == null) {
             badgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             badgeRingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);

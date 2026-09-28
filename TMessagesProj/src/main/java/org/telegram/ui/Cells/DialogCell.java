@@ -4846,6 +4846,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 }
                 storyParams.forceState = s;
             }
+            MyChatListSize.drawPendingPhotoBadge(this, canvas);
 
             if (!insideCommunityList && (chat != null && chat.linked_community_id != 0 || user != null && user.linked_community_id != 0) && !drawCommunityAvatar && isDialogCell && !isDialogFolder()) {
                 final float ccx = storyParams.originalAvatarRect.centerX() + dp(20.33f);
@@ -5357,7 +5358,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     private void drawCounter(Canvas canvas, boolean drawCounterMuted, int countTop, int countLeftLocal, int countLeftOld, float globalScale, boolean outline) {
         if (MyChatListSize.badgeOnPhoto()) {
             if (drawCount && drawCount2 && !outline && countLayout != null) {
-                MyChatListSize.drawPhotoBadge(this, canvas, countLayout, drawCounterMuted);
+                MyChatListSize.setPendingPhotoBadge(this, countLayout, drawCounterMuted); // drawn after the photo
             }
             return;
         }
