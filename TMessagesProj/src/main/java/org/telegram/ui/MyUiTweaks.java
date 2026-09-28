@@ -119,10 +119,14 @@ public class MyUiTweaks {
 
     // DialogsActivity hook: EditText's built-in ~48dp minimum height would push the text off-center at 40dp.
     public static void applyCompactSearch(TextView editText) {
-        if (compactSearch()) {
-            editText.setMinHeight(0);
-            editText.setMinimumHeight(0);
+        if (!compactSearch()) {
+            return;
         }
+        editText.setMinHeight(0);
+        editText.setMinimumHeight(0);
+        // Measured on device: in the 40dp field the text sat ~4dp above the pill's visual center
+        // (the glass pill is inset and shadowed unevenly), so move the text down by that much.
+        editText.setTranslationY(AndroidUtilities.dp(4));
     }
 
     // ---- Tinted pinned chats ----
