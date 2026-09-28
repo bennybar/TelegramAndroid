@@ -64,6 +64,23 @@ public class MyChatListSize {
         return params;
     }
 
+    public static final String[] LINE_LABELS = {"Default", "+2", "+4", "+6"};
+    private static final int[] LINE_GAP_DP = {0, 2, 4, 6};
+
+    public static int lineIndex() {
+        int index = MessagesController.getGlobalMainSettings().getInt("chatListLineSpacing", 0);
+        return Math.max(0, Math.min(LINE_GAP_DP.length - 1, index));
+    }
+
+    public static void setLineIndex(int index) {
+        MessagesController.getGlobalMainSettings().edit().putInt("chatListLineSpacing", index).apply();
+    }
+
+    // Extra space between the name and the preview, and between the two preview lines.
+    public static int lineGapPx() {
+        return AndroidUtilities.dp(LINE_GAP_DP[lineIndex()]);
+    }
+
     public static final String[] ROW_LABELS = {"Default", "+4", "+8", "+12", "+16"};
     private static final int[] ROW_EXTRA_DP = {0, 4, 8, 12, 16};
 
@@ -150,6 +167,9 @@ public class MyChatListSize {
         if (org.telegram.messenger.MyRtl.mirrorList()) {
             cell.messagePaddingStart += 6; // a little more room between the photo and the text in mirrored rows
         }
+        int lineGap = LINE_GAP_DP[lineIndex()];
+        cell.heightDefault += lineGap;          // name -> preview
+        cell.heightThreeLines += lineGap * 2;   // name -> preview, and between the two preview lines
         int rowExtra = ROW_EXTRA_DP[rowIndex()];
         cell.heightDefault += rowExtra;
         cell.heightThreeLines += rowExtra;
