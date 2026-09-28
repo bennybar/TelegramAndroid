@@ -19,6 +19,14 @@ public class MyChatTweaks {
         MessagesController.getGlobalMainSettings().edit().putBoolean("doubleTapReply", !doubleTapReply()).apply();
     }
 
+    public static boolean hideGiftButton() {
+        return MessagesController.getGlobalMainSettings().getBoolean("hideGiftButton", false);
+    }
+
+    public static void toggleHideGiftButton() {
+        MessagesController.getGlobalMainSettings().edit().putBoolean("hideGiftButton", !hideGiftButton()).apply();
+    }
+
     public static int bubbleIndex() {
         int index = MessagesController.getGlobalMainSettings().getInt("bubbleWidth", 0);
         return Math.max(0, Math.min(BUBBLE_WIDTHS.length - 1, index));

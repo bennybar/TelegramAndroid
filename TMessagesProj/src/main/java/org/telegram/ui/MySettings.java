@@ -131,6 +131,7 @@ public class MySettings {
     private static final int ID_BADGE_ON_PHOTO = 215;
     private static final int ID_TICKS_UNDER_TIME = 216;
     private static final int ID_BADGE_BORDER = 217;
+    private static final int ID_HIDE_GIFT = 218;
 
     public static void filterItems(ArrayList<UItem> items) {
         addOwnItems(items);
@@ -196,6 +197,8 @@ public class MySettings {
         items.add(next++, UItem.asHeader("Inside chats"));
         items.add(next++, UItem.asButtonCheck(ID_DOUBLE_TAP_REPLY, "Double-tap to reply", "Double-tap a message to reply to it, instead of sending a reaction.")
             .setChecked(MyChatTweaks.doubleTapReply()).setMultiline(true));
+        items.add(next++, UItem.asButtonCheck(ID_HIDE_GIFT, "Hide gift button", "No gift button in any chat, including channels and groups.")
+            .setChecked(MyChatTweaks.hideGiftButton()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_PREFER_RTL, "Prefer right-to-left", "Messages with any Hebrew in them read right-to-left, even when they start with an English word, number, link or emoji. Also while typing.")
             .setChecked(MyRtl.preferRtl()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_MIRROR_LIST, "Mirror chat list", "Right-to-left chat rows, like Telegram in Hebrew: photo on the right, time on the left. Menus stay in English.")
@@ -222,6 +225,11 @@ public class MySettings {
             MyRtl.toggleMirrorList();
             refresh.run();
             BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply.").show();
+            return true;
+        }
+        if (item.id == ID_HIDE_GIFT) {
+            MyChatTweaks.toggleHideGiftButton();
+            refresh.run();
             return true;
         }
         if (item.id == ID_PREFER_RTL) {
