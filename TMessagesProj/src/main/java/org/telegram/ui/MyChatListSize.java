@@ -51,8 +51,7 @@ public class MyChatListSize {
         pendingLayout = null;
     }
 
-    // The unread count as an app-icon style badge on the photo's top corner
-    // (top-right, or top-left in mirrored rows), with a ring in the background color.
+    // The unread count as an app-icon style badge on the photo's top-right corner, with a ring in the background color.
     private static void drawPhotoBadge(DialogCell cell, Canvas canvas, Layout countLayout, boolean muted) {
         if (badgePaint == null) {
             badgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -62,9 +61,7 @@ public class MyChatListSize {
         float textWidth = countLayout.getLineWidth(0);
         float width = Math.max(height, textWidth + AndroidUtilities.dp(12));
         float top = cell.avatarImage.getImageY() - AndroidUtilities.dp(2);
-        float left = LocaleController.isRTL
-            ? cell.avatarImage.getImageX() - AndroidUtilities.dp(2)
-            : cell.avatarImage.getImageX2() + AndroidUtilities.dp(2) - width;
+        float left = cell.avatarImage.getImageX2() + AndroidUtilities.dp(2) - width; // always the top-right corner
         badgeRect.set(left, top, left + width, top + height);
         float ring = AndroidUtilities.dp(2);
         badgeRingPaint.setColor(Theme.getColor(Theme.key_windowBackgroundWhite));
