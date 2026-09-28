@@ -4875,9 +4875,9 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 }
                 float y = getMeasuredHeight() - 1 - rightFragmentOffset * rightFragmentOpenedProgress;
                 if (LocaleController.isRTL) {
-                    canvas.drawLine(0, y, getMeasuredWidth() - left, y, Theme.dividerPaint);
+                    canvas.drawLine(MyChatListSize.dividerEndInset(), y, getMeasuredWidth() - left, y, Theme.dividerPaint);
                 } else {
-                    canvas.drawLine(left, y, getMeasuredWidth(), y, Theme.dividerPaint);
+                    canvas.drawLine(left, y, getMeasuredWidth() - MyChatListSize.dividerEndInset(), y, Theme.dividerPaint);
                 }
                 if (rightFragmentOpenedProgress != 0) {
                     Theme.dividerPaint.setAlpha(alpha);
