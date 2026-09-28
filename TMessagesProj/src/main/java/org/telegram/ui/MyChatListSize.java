@@ -111,8 +111,11 @@ public class MyChatListSize {
             cell.heightDefault = Math.round(cell.heightDefault + extra * 36);    // name + one preview line
             cell.heightThreeLines = Math.round(cell.heightThreeLines + extra * 44); // name + two preview lines
         }
-        cell.avatarStart += sidePaddingDp();
-        cell.messagePaddingStart += sidePaddingDp();
+        if (!org.telegram.messenger.MyRtl.mirrorList()) {
+            // Mirrored rows keep the photo on the right, where the narrower row already adds the padding.
+            cell.avatarStart += sidePaddingDp();
+            cell.messagePaddingStart += sidePaddingDp();
+        }
         float avatar = avatarScale();
         if (avatar != 1f) {
             // Text starts after the avatar: move it by the avatar's growth (56dp two-line avatar as reference).
