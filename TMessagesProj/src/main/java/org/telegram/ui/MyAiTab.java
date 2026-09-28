@@ -13,16 +13,24 @@ import org.telegram.ui.Components.glass.GlassTabView;
 // switching pages, so upstream's tab positions stay untouched.
 public class MyAiTab {
 
-    // Contacts page position in MainTabsActivity (Chats=0, Contacts=1, Calls/Settings=2, Profile=3).
+    // Page positions in MainTabsActivity (Chats=0, Contacts=1, Calls/Settings=2, Profile=3).
     private static final int CONTACTS_POSITION = 1;
+    private static final int PROFILE_POSITION = 3;
+    private static boolean profileHidden;
 
-    // The Contacts tab is hidden (contacts stay reachable from the compose button), so swipes must not land on it.
+    // Hidden tabs (Contacts always, Profile optionally) must not be reachable by swiping either.
     public static boolean blocksSlide(int currentPosition, boolean forward) {
-        return forward ? currentPosition + 1 == CONTACTS_POSITION : currentPosition - 1 == CONTACTS_POSITION;
+        int target = forward ? currentPosition + 1 : currentPosition - 1;
+        return target == CONTACTS_POSITION || profileHidden && target == PROFILE_POSITION;
     }
 
-    public static void install(BaseFragment parent, Context context, Theme.ResourcesProvider resourcesProvider, MainTabsLayout tabsView, View settingsTab, View contactsTab, Runnable restoreSelection) {
+    public static void install(BaseFragment parent, Context context, Theme.ResourcesProvider resourcesProvider, MainTabsLayout tabsView, View settingsTab, View contactsTab, View profileTab, boolean callsTabShown, Runnable restoreSelection) {
         tabsView.setViewVisible(contactsTab, false, false);
+        // With the Calls tab shown, Settings lives only behind Profile, so Profile stays in that case.
+        profileHidden = MyUiTweaks.hideProfileTab() && !callsTabShown;
+        if (profileHidden) {
+            tabsView.setViewVisible(profileTab, false, false);
+        }
         GlassTabView tab = GlassTabView.createMainTab(context, resourcesProvider, GlassTabView.TabAnimation.ARTICLE, R.string.MyAiTab);
         tab.setOnClickListener(v -> {
             parent.presentFragment(new AiSummaryActivity());
