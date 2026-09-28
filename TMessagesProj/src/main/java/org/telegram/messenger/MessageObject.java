@@ -8605,7 +8605,8 @@ public class MessageObject {
                             .setLineSpacing(lineSpacingAdd, lineSpacingMult)
                             .setBreakStrategy(StaticLayout.BREAK_STRATEGY_HIGH_QUALITY)
                             .setHyphenationFrequency(StaticLayout.HYPHENATION_FREQUENCY_NONE)
-                            .setAlignment(alignment);
+                            .setAlignment(alignment)
+                            .setTextDirection(MyRtl.textDirection());
             if (dontIncludePad) {
                 builder.setIncludePad(false);
             }
@@ -8626,7 +8627,8 @@ public class MessageObject {
                                 .setLineSpacing(lineSpacingAdd, lineSpacingMult)
                                 .setBreakStrategy(StaticLayout.BREAK_STRATEGY_SIMPLE)
                                 .setHyphenationFrequency(StaticLayout.HYPHENATION_FREQUENCY_NONE)
-                                .setAlignment(alignment);
+                                .setAlignment(alignment)
+                                .setTextDirection(MyRtl.textDirection());
                 if (dontIncludePad) {
                     builder.setIncludePad(false);
                 }

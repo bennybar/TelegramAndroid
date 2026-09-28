@@ -11,6 +11,7 @@ import org.telegram.messenger.R;
 
 import org.telegram.messenger.MyFcmDistributor;
 import org.telegram.messenger.MyFonts;
+import org.telegram.messenger.MyRtl;
 import org.telegram.messenger.forkgram.ForkDialogs;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.Components.BulletinFactory;
@@ -125,6 +126,7 @@ public class MySettings {
     private static final int ID_COMPACT_SEARCH = 210;
     private static final int ID_PINNED_TINT = 211;
     private static final int ID_DOUBLE_TAP_REPLY = 212;
+    private static final int ID_PREFER_RTL = 213;
 
     public static void filterItems(ArrayList<UItem> items) {
         addOwnItems(items);
@@ -175,6 +177,8 @@ public class MySettings {
         items.add(next++, UItem.asHeader("Inside chats"));
         items.add(next++, UItem.asButtonCheck(ID_DOUBLE_TAP_REPLY, "Double-tap to reply", "Double-tap a message to reply to it, instead of sending a reaction.")
             .setChecked(MyChatTweaks.doubleTapReply()).setMultiline(true));
+        items.add(next++, UItem.asButtonCheck(ID_PREFER_RTL, "Prefer right-to-left", "Messages with any Hebrew in them read right-to-left, even when they start with an English word, number, link or emoji. Also while typing.")
+            .setChecked(MyRtl.preferRtl()).setMultiline(true));
         items.add(next++, UItem.asShadow(null));
         items.add(next++, UItem.asHeader("Message bubble width"));
         items.add(next++, UItem.asSlideView(MyChatTweaks.BUBBLE_LABELS, MyChatTweaks.bubbleIndex(), MyChatTweaks::setBubbleIndex));
@@ -187,6 +191,12 @@ public class MySettings {
     }
 
     public static boolean onClick(BaseFragment fragment, UItem item, Runnable refresh) {
+        if (item.id == ID_PREFER_RTL) {
+            MyRtl.togglePreferRtl();
+            refresh.run();
+            BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply.").show();
+            return true;
+        }
         if (item.id == ID_DOUBLE_TAP_REPLY) {
             MyChatTweaks.toggleDoubleTapReply();
             refresh.run();
