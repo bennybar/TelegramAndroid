@@ -1,5 +1,7 @@
 package org.telegram.ui;
 
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.graphics.RectF;
 
 import org.telegram.messenger.AndroidUtilities;
@@ -16,6 +18,30 @@ public class MyChatListSize {
     private static final float[] SCALES = {0.9f, 1f, 1.05f, 1.1f, 1.15f};
     public static final String[] AVATAR_LABELS = {"80%", "90%", "100%", "110%", "120%"};
     private static final float[] AVATAR_SCALES = {0.8f, 0.9f, 1f, 1.1f, 1.2f};
+
+    public static boolean unreadDot() {
+        return MessagesController.getGlobalMainSettings().getBoolean("chatListUnreadDot", false);
+    }
+
+    public static boolean dividers() {
+        return MessagesController.getGlobalMainSettings().getBoolean("chatListDividers", false);
+    }
+
+    public static void toggle(String key) {
+        MessagesController.getGlobalMainSettings().edit().putBoolean(key, !MessagesController.getGlobalMainSettings().getBoolean(key, false)).apply();
+    }
+
+    private static Paint dotPaint;
+
+    // Replaces the count badge: a dot outside the photo, blue for unread, grey when muted.
+    public static void drawUnreadDot(DialogCell cell, Canvas canvas, boolean muted) {
+        if (dotPaint == null) {
+            dotPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        }
+        dotPaint.setColor(Theme.getColor(muted ? Theme.key_chats_unreadCounterMuted : Theme.key_chats_unreadCounter));
+        float x = LocaleController.isRTL ? cell.getMeasuredWidth() - AndroidUtilities.dp(11.5f) : AndroidUtilities.dp(11.5f);
+        canvas.drawCircle(x, cell.avatarImage.getCenterY(), AndroidUtilities.dp(5), dotPaint);
+    }
 
     public static int avatarIndex() {
         int index = MessagesController.getGlobalMainSettings().getInt("chatListAvatarSize", 2);
@@ -71,6 +97,11 @@ public class MyChatListSize {
         if (extra != 0) {
             cell.heightDefault = Math.round(cell.heightDefault + extra * 36);    // name + one preview line
             cell.heightThreeLines = Math.round(cell.heightThreeLines + extra * 44); // name + two preview lines
+        }
+        if (unreadDot()) {
+            // Room for the dot outside the photo.
+            cell.avatarStart += 12;
+            cell.messagePaddingStart += 12;
         }
         float avatar = avatarScale();
         if (avatar != 1f) {

@@ -2550,7 +2550,10 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             if (countString != null) {
                 countWidth = Math.max(dp(BADGE_TEXT_MIN_WIDTH), (int) Math.ceil(Theme.dialogs_countTextPaint2.measureText(countString)));
                 countLayout = new StaticLayout(countString, Theme.dialogs_countTextPaint2, countWidth, Layout.Alignment.ALIGN_CENTER, 1.0f, 0.0f, false);
-                int w = countWidth + dp(BADGE_GAP);
+                if (MyChatListSize.unreadDot()) {
+                    countWidth = 0; // the dot sits left of the photo, so no badge room is reserved
+                }
+                int w = countWidth == 0 ? 0 : countWidth + dp(BADGE_GAP);
                 messageWidth -= w;
                 if (!LocaleController.isRTL) {
                     countLeft = getMeasuredWidth() - dp(BADGE_MARGIN) - (countWidth + dp(BADGE_TEXT_PADDING * 2));
@@ -5310,6 +5313,12 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     }
 
     private void drawCounter(Canvas canvas, boolean drawCounterMuted, int countTop, int countLeftLocal, int countLeftOld, float globalScale, boolean outline) {
+        if (MyChatListSize.unreadDot()) {
+            if (drawCount && drawCount2 && !outline) {
+                MyChatListSize.drawUnreadDot(this, canvas, drawCounterMuted);
+            }
+            return;
+        }
         final boolean drawBubble = isForumCell() || isFolderCell();
         if (drawCount && drawCount2 || countChangeProgress != 1f) {
             final float progressFinal = (unreadCount == 0 && !markUnread) ? 1f - countChangeProgress : countChangeProgress;
