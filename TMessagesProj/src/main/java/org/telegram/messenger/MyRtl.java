@@ -33,6 +33,20 @@ public class MyRtl {
         return shift;
     }
 
+    // DialogCell hook (LTR app): Telegram left-anchors a right-to-left name. Keep it right-aligned instead, ending
+    // just before the mute/verified icons and the time, so it lines up with its right-aligned preview.
+    public static boolean keepRtlNameRight(Layout nameLayout) {
+        return preferRtl() && nameLayout.getParagraphDirection(0) == Layout.DIR_RIGHT_TO_LEFT;
+    }
+
+    // DialogCell hook: previews end at the time's 15dp margin instead of running almost to the screen edge.
+    public static int previewEndTrim(int cellWidth, int messageLeft, int messageWidth) {
+        if (!preferRtl() || LocaleController.isRTL || cellWidth <= 0) {
+            return 0;
+        }
+        return Math.max(0, messageLeft + messageWidth - (cellWidth - AndroidUtilities.dp(15)));
+    }
+
     // ChatActivityEnterView hook: the message field follows the same rule while typing.
     public static void applyToInput(TextView input) {
         if (preferRtl()) {

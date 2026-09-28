@@ -2728,6 +2728,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 }
             }
         }
+        messageWidth -= org.telegram.messenger.MyRtl.previewEndTrim(getMeasuredWidth(), messageLeft, messageWidth);
         messageWidth = Math.max(dp(12), messageWidth);
         buttonTop = dp(useForceThreeLines || SharedConfig.useThreeLinesLayout ? 58 : 62);
         if ((!(useForceThreeLines || SharedConfig.useThreeLinesLayout) || isForumCell()) && hasTags()) {
@@ -2959,7 +2960,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
 //                        widthpx -= dp(36);
 //                        left += dp(36);
                     }
-                    if (widthpx < nameWidth) {
+                    if (widthpx < nameWidth && !org.telegram.messenger.MyRtl.keepRtlNameRight(nameLayout)) {
                         nameLeft -= (nameWidth - widthpx);
                     }
                 }
