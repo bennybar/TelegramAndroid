@@ -297,7 +297,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     public static final int MAIN_TABS_HEIGHT_WITH_MARGINS = MAIN_TABS_HEIGHT + MAIN_TABS_MARGIN * 2;
     public static final int FILTER_TABS_HEIGHT = 36;
     public static final int SEARCH_TABS_HEIGHT = 36 + 7 + 7;
-    public static final int SEARCH_FIELD_HEIGHT = 48;
+    public static final int SEARCH_FIELD_HEIGHT = MyUiTweaks.searchFieldHeight();
 
     private static final int ANIMATOR_ID_SEARCH_VISIBLE = 1;
     private static final int ANIMATOR_ID_DONE_BUTTON_VISIBLE = 2;
@@ -5346,7 +5346,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
             contentView.addView(animatedStatusView, LayoutHelper.createFrame(20, 20, Gravity.LEFT | Gravity.TOP));
         }
         if (fragmentSearchField != null) {
-            contentView.addView(fragmentSearchField, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 48, Gravity.TOP, 7, -2, 7, 0));
+            contentView.addView(fragmentSearchField, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, SEARCH_FIELD_HEIGHT, Gravity.TOP, 7, -2, 7, 0));
         }
 
 

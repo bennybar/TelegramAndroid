@@ -1,5 +1,7 @@
 package org.telegram.ui.Components.glass;
 
+import org.telegram.ui.MyUiTweaks;
+
 import static org.telegram.messenger.AndroidUtilities.dp;
 import static org.telegram.messenger.AndroidUtilities.dpf2;
 import static org.telegram.messenger.AndroidUtilities.lerp;
@@ -151,7 +153,8 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
     protected void dispatchDraw(@NonNull Canvas canvas) {
         final float viewWidth = hasVisualWidth ? visualWidth : getWidth();
         final float selectedFactor = hasGestureSelectedOverride ? gestureSelectedOverride : isSelectedAnimator.getFloatValue();
-        if (selectedFactor > 0 && !skipDrawSelector) {
+        if (selectedFactor > 0 && !skipDrawSelector
+                && !MyUiTweaks.drawMainTabIndicator(this, canvas, selectedFactor, backupImageView != null ? backupImageView : imageView)) {
             final float alpha = AnimatorUtils.DECELERATE_INTERPOLATOR.getInterpolation(selectedFactor);
 
             paintCounterBackground.setColor(Theme.multAlpha(colorSelected, 0.09f * alpha));
@@ -408,6 +411,7 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
         tab.colorSelected = Theme.getColor(Theme.key_glass_tabSelected, resourcesProvider);
         tab.colorSelectedText = Theme.getColor(Theme.key_glass_tabSelectedText, resourcesProvider);
         tab.updateColors();
+        MyUiTweaks.layoutMainTab(tab, tab.imageView, tab.textView);
         return tab;
     }
 
@@ -429,6 +433,7 @@ public class GlassTabView extends FrameLayout implements MainTabsLayout.Tab, Fac
         tab.colorSelected = Theme.getColor(Theme.key_glass_tabSelected, resourcesProvider);
         tab.colorSelectedText = Theme.getColor(Theme.key_glass_tabSelectedText, resourcesProvider);
         tab.updateColors();
+        MyUiTweaks.layoutMainTab(tab, backupImageView, tab.textView);
         return tab;
     }
 

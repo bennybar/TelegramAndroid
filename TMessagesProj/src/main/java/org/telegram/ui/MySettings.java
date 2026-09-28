@@ -120,6 +120,10 @@ public class MySettings {
     private static final int ID_DEVICE_FONT = 204;
     private static final int ID_GOOGLE_SANS = 205;
     private static final int ID_DIVIDERS = 207;
+    private static final int ID_MD3_TAB_BAR = 208;
+    private static final int ID_HIDE_PROFILE_TAB = 209;
+    private static final int ID_COMPACT_SEARCH = 210;
+    private static final int ID_PINNED_TINT = 211;
 
     public static void filterItems(ArrayList<UItem> items) {
         addOwnItems(items);
@@ -158,6 +162,14 @@ public class MySettings {
         items.add(next++, UItem.asShadow(null));
         items.add(next++, UItem.asButtonCheck(ID_DIVIDERS, "List dividers", "A thin line between chats, with the same margin on both sides.")
             .setChecked(MyChatListSize.dividers()).setMultiline(true));
+        items.add(next++, UItem.asButtonCheck(ID_PINNED_TINT, "Tint pinned chats", "A faint accent background on pinned chats instead of the pin next to the time.")
+            .setChecked(MyUiTweaks.pinnedTint()).setMultiline(true));
+        items.add(next++, UItem.asButtonCheck(ID_COMPACT_SEARCH, "Compact search bar", "A slimmer search field above the chat list.")
+            .setChecked(MyUiTweaks.compactSearch()).setMultiline(true));
+        items.add(next++, UItem.asButtonCheck(ID_MD3_TAB_BAR, "Material bottom bar", "A flat, full-width Material 3 bar instead of the floating glass one.")
+            .setChecked(MyUiTweaks.md3TabBar()).setMultiline(true));
+        items.add(next++, UItem.asButtonCheck(ID_HIDE_PROFILE_TAB, "Hide Profile tab", "Your profile stays reachable from Settings. Kept while the Calls tab is shown.")
+            .setChecked(MyUiTweaks.hideProfileTab()).setMultiline(true));
         items.add(next, UItem.asShadow("Reopen Tegram after changing any of these."));
         items.add(UItem.asHeader("Google push"));
         String relay = MyFcmDistributor.relayUrl();
@@ -167,6 +179,12 @@ public class MySettings {
     }
 
     public static boolean onClick(BaseFragment fragment, UItem item, Runnable refresh) {
+        if (item.id == ID_MD3_TAB_BAR || item.id == ID_HIDE_PROFILE_TAB || item.id == ID_COMPACT_SEARCH || item.id == ID_PINNED_TINT) {
+            MyUiTweaks.toggle(item.id == ID_MD3_TAB_BAR ? "md3TabBar" : item.id == ID_HIDE_PROFILE_TAB ? "hideProfileTab" : item.id == ID_COMPACT_SEARCH ? "compactSearch" : "pinnedTint");
+            refresh.run();
+            BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply.").show();
+            return true;
+        }
         if (item.id == ID_DIVIDERS) {
             MyChatListSize.toggle("chatListDividers");
             refresh.run();

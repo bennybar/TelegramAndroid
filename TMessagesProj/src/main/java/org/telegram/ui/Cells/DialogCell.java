@@ -115,6 +115,7 @@ import org.telegram.ui.Components.PullForegroundDrawable;
 import org.telegram.ui.Components.QuoteSpan;
 import org.telegram.ui.Components.RLottieDrawable;
 import org.telegram.ui.MyChatListSize;
+import org.telegram.ui.MyUiTweaks;
 import org.telegram.ui.Components.Reactions.ReactionsLayoutInBubble;
 import org.telegram.ui.Components.StaticLayoutEx;
 import org.telegram.ui.Components.StatusDrawable;
@@ -2302,7 +2303,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             final TextPaint tp = getTimeTextPaint();
             timeWidth = (int) Math.ceil(tp.measureText(timeString));
             timeLayout = new StaticLayout(timeString, tp, timeWidth, Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
-            timeWidth += dp(getIsPinned() ? 24 : 0);
+            timeWidth += dp(MyUiTweaks.showPinnedPill(this) ? 24 : 0);
             if (!LocaleController.isRTL) {
                 timeLeft = getMeasuredWidth() - dp(15) - timeWidth;
             } else {
@@ -4066,6 +4067,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         }
 
         float cornersRadius = dp(8) * cornerProgress;
+        MyUiTweaks.drawPinnedBackground(this, canvas);
         if (isSelected) {
             rect.set(0, 0, getMeasuredWidth(), AndroidUtilities.lerp(getMeasuredHeight(), getCollapsedHeight(), rightFragmentOpenedProgress));
             rect.offset(0, -translateY + collapseOffset);
@@ -4210,7 +4212,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 canvas.translate(timeLeft, timeTop);
 
                 final TextPaint timeTextPaint = getTimeTextPaint();
-                if (getIsPinned()) {
+                if (MyUiTweaks.showPinnedPill(this)) {
                     canvas.translate(dp(20), 0);
 
                     final float y = timeLayout.getHeight() / 2f - dp(17 / 2f);

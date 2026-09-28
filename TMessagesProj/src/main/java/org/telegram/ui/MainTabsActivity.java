@@ -354,7 +354,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             tabsView.addView(tabs[index]);
             tabsView.setViewVisible(view, true, false);
         }
-        MyAiTab.install(this, context, resourceProvider, tabsView, tabs[INDEX_SETTINGS], tabs[INDEX_CONTACTS], () -> selectTab(viewPager.getCurrentPosition(), false));
+        MyAiTab.install(this, context, resourceProvider, tabsView, tabs[INDEX_SETTINGS], tabs[INDEX_CONTACTS], tabs[INDEX_PROFILE], getUserConfig().showCallsTab, () -> selectTab(viewPager.getCurrentPosition(), false));
         checkUi_callTabVisible(getUserConfig().showCallsTab, false);
 
         selectTab(viewPager.getCurrentPosition(), false);
@@ -387,6 +387,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         tabsViewWrapper.addView(tabsView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, DialogsActivity.MAIN_TABS_HEIGHT_WITH_MARGINS, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL));
         tabsViewWrapper.setClipToPadding(false);
         contentView.addView(tabsViewWrapper, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM));
+        MyUiTweaks.applyTabBar(tabsView, tabsViewWrapper, fadeView);
 
         updateLayoutWrapper = new UpdateLayoutWrapper(context);
         contentView.addView(updateLayoutWrapper, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM));
