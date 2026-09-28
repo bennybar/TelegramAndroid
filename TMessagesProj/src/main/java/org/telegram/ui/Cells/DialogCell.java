@@ -2794,7 +2794,6 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             }
 
             Layout.Alignment align = isForum && LocaleController.isRTL ? Layout.Alignment.ALIGN_OPPOSITE : Layout.Alignment.ALIGN_NORMAL;
-            align = MyIMessageStyle.previewAlign(this, messageStringFinal, align);
             if ((useForceThreeLines || SharedConfig.useThreeLinesLayout) && !hasTags()) {
                 if (thumbsCount > 0 && messageNameString != null) {
                     messageWidth += dp(5);

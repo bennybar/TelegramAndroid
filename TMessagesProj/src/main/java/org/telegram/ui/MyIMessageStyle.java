@@ -4,7 +4,6 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.text.Layout;
-import android.text.TextDirectionHeuristics;
 import android.text.TextPaint;
 
 import org.telegram.messenger.AndroidUtilities;
@@ -52,16 +51,6 @@ public class MyIMessageStyle {
     // Previews end under the chevron instead of running to the cell edge.
     public static int previewTrim(DialogCell cell) {
         return isStyled(cell) && !LocaleController.isRTL ? AndroidUtilities.dp(12) : 0;
-    }
-
-    // Like iOS "natural" alignment: follow the app's language, not the text's. English UI -> every preview starts
-    // on the left (Hebrew still reads right-to-left inside the line); Hebrew UI -> every preview starts on the right.
-    public static Layout.Alignment previewAlign(DialogCell cell, CharSequence text, Layout.Alignment align) {
-        if (!isStyled(cell) || text == null) {
-            return align;
-        }
-        boolean textRtl = TextDirectionHeuristics.FIRSTSTRONG_LTR.isRtl(text, 0, text.length());
-        return textRtl == LocaleController.isRTL ? Layout.Alignment.ALIGN_NORMAL : Layout.Alignment.ALIGN_OPPOSITE;
     }
 
     // How far to move the time left so the chevron fits after it.
