@@ -2980,7 +2980,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                     for (int a = 0; a < lineCount; a++) {
                         left = Math.min(left, messageLayout.getLineLeft(a));
                     }
-                    messageLeft -= left;
+                    messageLeft -= org.telegram.messenger.MyRtl.previewShift(messageLayout, left);
                 }
             }
             if (buttonLayout != null) {
