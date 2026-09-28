@@ -48,6 +48,11 @@ public class MyIMessageStyle {
         return cell.avatarStart == STYLED_AVATAR_START;
     }
 
+    // Previews end under the chevron instead of running to the cell edge.
+    public static int previewTrim(DialogCell cell) {
+        return isStyled(cell) ? AndroidUtilities.dp(12) : 0;
+    }
+
     // How far to move the time left so the chevron fits after it.
     public static int timeShift(DialogCell cell) {
         return isStyled(cell) ? AndroidUtilities.dp(CHEVRON_SPACE_DP) : 0;
