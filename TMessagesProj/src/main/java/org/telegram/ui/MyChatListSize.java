@@ -57,19 +57,22 @@ public class MyChatListSize {
             badgePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             badgeRingPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         }
-        float height = AndroidUtilities.dp(20);
-        float textWidth = countLayout.getLineWidth(0);
-        float width = Math.max(height, textWidth + AndroidUtilities.dp(12));
-        float top = cell.avatarImage.getImageY() - AndroidUtilities.dp(2);
-        float left = cell.avatarImage.getImageX2() + AndroidUtilities.dp(2) - width; // always the top-right corner
+        float scale = avatarScale(); // follows the photo size slider
+        float height = AndroidUtilities.dp(20) * scale;
+        float textWidth = countLayout.getLineWidth(0) * scale;
+        float width = Math.max(height, textWidth + AndroidUtilities.dp(12) * scale);
+        float top = cell.avatarImage.getImageY() - AndroidUtilities.dp(2) * scale;
+        float left = cell.avatarImage.getImageX2() + AndroidUtilities.dp(2) * scale - width; // always the top-right corner
         badgeRect.set(left, top, left + width, top + height);
-        float ring = AndroidUtilities.dp(2);
+        float ring = AndroidUtilities.dp(2) * scale;
         badgeRingPaint.setColor(Theme.getColor(Theme.key_windowBackgroundWhite));
         canvas.drawRoundRect(badgeRect.left - ring, badgeRect.top - ring, badgeRect.right + ring, badgeRect.bottom + ring, height / 2 + ring, height / 2 + ring, badgeRingPaint);
         badgePaint.setColor(Theme.getColor(muted ? Theme.key_chats_unreadCounterMuted : Theme.key_chats_unreadCounter));
         canvas.drawRoundRect(badgeRect, height / 2, height / 2, badgePaint);
         canvas.save();
-        canvas.translate(badgeRect.centerX() - countLayout.getWidth() / 2f, badgeRect.centerY() - countLayout.getHeight() / 2f);
+        canvas.translate(badgeRect.centerX(), badgeRect.centerY());
+        canvas.scale(scale, scale);
+        canvas.translate(-countLayout.getWidth() / 2f, -countLayout.getHeight() / 2f);
         countLayout.draw(canvas);
         canvas.restore();
     }
