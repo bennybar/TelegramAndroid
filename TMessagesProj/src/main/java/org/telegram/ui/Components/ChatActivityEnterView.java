@@ -3827,6 +3827,10 @@ public class ChatActivityEnterView extends FrameLayout implements
     private boolean suggestButtonVisible;
     private ValueAnimator suggestButtonAppear;
     public void setSuggestionButtonVisible(boolean visible, boolean animated) {
+        if (visible && org.telegram.ui.MyChatTweaks.hideSuggestButton()) {
+            setSuggestionButtonVisible(false, animated);
+            return;
+        }
         if (suggestButtonVisible == visible && animated) return;
         if (suggestButton == null) {
             if (visible || isLiveComment) {
@@ -13794,7 +13798,7 @@ public class ChatActivityEnterView extends FrameLayout implements
             TL_bots.BotMenuButton botMenuButton = (TL_bots.BotMenuButton) args[1];
 
             if (botId == dialog_id) {
-                if (botMenuButton instanceof TL_bots.TL_botMenuButton) {
+                if (botMenuButton instanceof TL_bots.TL_botMenuButton && !org.telegram.ui.MyChatTweaks.hideBotAppButton()) {
                     TL_bots.TL_botMenuButton webViewButton = (TL_bots.TL_botMenuButton) botMenuButton;
                     botMenuWebViewTitle = webViewButton.text;
                     botMenuWebViewUrl = webViewButton.url;
@@ -14868,7 +14872,7 @@ public class ChatActivityEnterView extends FrameLayout implements
         if (botInfo.size() == 1 && botInfo.valueAt(0).user_id == dialog_id) {
             TL_bots.BotInfo info = botInfo.valueAt(0);
             TL_bots.BotMenuButton menuButton = info.menu_button;
-            if (menuButton instanceof TL_bots.TL_botMenuButton) {
+            if (menuButton instanceof TL_bots.TL_botMenuButton && !org.telegram.ui.MyChatTweaks.hideBotAppButton()) {
                 TL_bots.TL_botMenuButton webViewButton = (TL_bots.TL_botMenuButton) menuButton;
                 botMenuWebViewTitle = webViewButton.text;
                 botMenuWebViewUrl = webViewButton.url;

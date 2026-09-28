@@ -219,7 +219,7 @@ public class ProfileSearchCell extends BaseCell implements NotificationCenter.No
             final TL_account.RequirementToContact r = showPremiumBlocked && user != null ? MessagesController.getInstance(currentAccount).isUserContactBlocked(user.id) : null;
             premiumBlocked = DialogObject.isPremiumBlocked(r);
             starsPriceBlocked = DialogObject.getMessagesStarsPrice(r);
-            setOpenBotButton(allowBotOpenButton && user.bot_has_main_app);
+            setOpenBotButton(allowBotOpenButton && user.bot_has_main_app && !org.telegram.ui.MyChatTweaks.hideBotAppButton());
         } else if (object instanceof TLRPC.Chat) {
             chat = (TLRPC.Chat) object;
             user = null;

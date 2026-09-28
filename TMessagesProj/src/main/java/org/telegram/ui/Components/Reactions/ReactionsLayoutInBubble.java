@@ -239,6 +239,7 @@ public class ReactionsLayoutInBubble {
                     } else {
                         reactionCount = messageObject.messageOwner.reactions.results.get(i);
                     }
+                    if (reactionCount.reaction instanceof TLRPC.TL_reactionPaid && org.telegram.ui.MyChatTweaks.hidePaidReactions()) continue; // Fork: hide paid (star) reactions
                     ReactionButton old = null;
                     for (int j = 0; j < oldButtons.size(); ++j) {
                         ReactionButton btn = oldButtons.get(j);
