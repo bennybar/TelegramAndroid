@@ -4,16 +4,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.net.Uri;
 
-import org.telegram.messenger.AndroidUtilities;
-import org.telegram.messenger.ApplicationLoader;
-import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
-import org.telegram.ui.ActionBar.Theme;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
 
 import org.telegram.messenger.MyFcmDistributor;
 import org.telegram.messenger.forkgram.ForkDialogs;
@@ -122,8 +113,7 @@ public class MySettings {
 
     private static final int ID_GOOGLE_PUSH_RELAY = 201;
     private static final int ID_CATCH_UP_MARKS_READ = 202;
-    private static final int ID_IMESSAGE_THEME = 203;
-    private static final String IMESSAGE_THEME_NAME = "Tegram iMessage.attheme";
+    private static final int ID_IMESSAGE_CHAT_LIST = 203;
 
     public static void filterItems(ArrayList<UItem> items) {
         addOwnItems(items);
@@ -144,42 +134,11 @@ public class MySettings {
         }
     }
 
-    private static boolean iMessageThemeActive() {
-        return IMESSAGE_THEME_NAME.equals(Theme.getActiveTheme().getKey());
-    }
-
-    // Installs the bundled theme (res/raw/tegram_imessage.attheme) and switches to it, or back to the default theme.
-    private static void setIMessageTheme(boolean on) {
-        Theme.ThemeInfo theme;
-        if (on) {
-            theme = Theme.getTheme(IMESSAGE_THEME_NAME);
-            if (theme == null) {
-                File file = new File(ApplicationLoader.applicationContext.getCacheDir(), IMESSAGE_THEME_NAME);
-                try (InputStream in = ApplicationLoader.applicationContext.getResources().openRawResource(R.raw.tegram_imessage);
-                     OutputStream out = new FileOutputStream(file)) {
-                    byte[] buffer = new byte[4096];
-                    int read;
-                    while ((read = in.read(buffer)) != -1) {
-                        out.write(buffer, 0, read);
-                    }
-                } catch (Exception e) {
-                    return;
-                }
-                theme = Theme.applyThemeFile(file, IMESSAGE_THEME_NAME, null, false);
-            }
-        } else {
-            theme = Theme.getTheme("Blue");
-        }
-        if (theme != null) {
-            NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.needSetDayNightTheme, theme, false, null, -1);
-        }
-    }
-
     private static void addOwnItems(ArrayList<UItem> items) {
         items.add(0, UItem.asHeader("Look"));
-        items.add(1, UItem.asButtonCheck(ID_IMESSAGE_THEME, "iMessage theme", "Blue bubbles and clean white chats. Turn off to go back to the default theme.")
-            .setChecked(iMessageThemeActive()).setMultiline(true));
-        items.add(2, UItem.asShadow("Tip: Chat Settings → Message corners, all the way up, completes the look."));
+        items.add(1, UItem.asButtonCheck(ID_IMESSAGE_CHAT_LIST, "iMessage-style chat list", "Blue unread dot instead of count badges, time with ›, two-line previews.")
+            .setChecked(MyIMessageStyle.enabled()).setMultiline(true));
+        items.add(2, UItem.asShadow("Reopen Tegram after changing this."));
         items.add(UItem.asHeader("Google push"));
         String relay = MyFcmDistributor.relayUrl();
         items.add(UItem.asSettingsCell(ID_GOOGLE_PUSH_RELAY, "Google push relay", relay.isEmpty() ? "Not set" : Uri.parse(relay).getHost()));
@@ -188,9 +147,10 @@ public class MySettings {
     }
 
     public static boolean onClick(BaseFragment fragment, UItem item, Runnable refresh) {
-        if (item.id == ID_IMESSAGE_THEME) {
-            setIMessageTheme(!iMessageThemeActive());
-            AndroidUtilities.runOnUIThread(refresh, 300);
+        if (item.id == ID_IMESSAGE_CHAT_LIST) {
+            MyIMessageStyle.setEnabled(!MyIMessageStyle.enabled());
+            refresh.run();
+            BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply.").show();
             return true;
         }
         if (item.id == ID_CATCH_UP_MARKS_READ) {
