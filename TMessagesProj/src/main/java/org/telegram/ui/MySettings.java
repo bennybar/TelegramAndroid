@@ -119,7 +119,6 @@ public class MySettings {
     private static final int ID_CATCH_UP_MARKS_READ = 202;
     private static final int ID_DEVICE_FONT = 204;
     private static final int ID_GOOGLE_SANS = 205;
-    private static final int ID_UNREAD_DOT = 206;
     private static final int ID_DIVIDERS = 207;
 
     public static void filterItems(ArrayList<UItem> items) {
@@ -157,9 +156,7 @@ public class MySettings {
         items.add(next++, UItem.asHeader("Chat list photo size"));
         items.add(next++, UItem.asSlideView(MyChatListSize.AVATAR_LABELS, MyChatListSize.avatarIndex(), MyChatListSize::setAvatarIndex));
         items.add(next++, UItem.asShadow(null));
-        items.add(next++, UItem.asButtonCheck(ID_UNREAD_DOT, "Unread dot", "A blue dot left of the photo instead of the unread count (grey when muted).")
-            .setChecked(MyChatListSize.unreadDot()).setMultiline(true));
-        items.add(next++, UItem.asButtonCheck(ID_DIVIDERS, "List dividers", "A thin line between chats, starting under the name.")
+        items.add(next++, UItem.asButtonCheck(ID_DIVIDERS, "List dividers", "A thin line between chats, with the same margin on both sides.")
             .setChecked(MyChatListSize.dividers()).setMultiline(true));
         items.add(next, UItem.asShadow("Reopen Tegram after changing any of these."));
         items.add(UItem.asHeader("Google push"));
@@ -170,8 +167,8 @@ public class MySettings {
     }
 
     public static boolean onClick(BaseFragment fragment, UItem item, Runnable refresh) {
-        if (item.id == ID_UNREAD_DOT || item.id == ID_DIVIDERS) {
-            MyChatListSize.toggle(item.id == ID_UNREAD_DOT ? "chatListUnreadDot" : "chatListDividers");
+        if (item.id == ID_DIVIDERS) {
+            MyChatListSize.toggle("chatListDividers");
             refresh.run();
             BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply.").show();
             return true;
