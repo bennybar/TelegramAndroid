@@ -2484,6 +2484,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 thumbLeft = avatarLeft + dp(56 + 13);
             }
             storyParams.originalAvatarRect.set(avatarLeft, avatarTop, avatarLeft + dp(56), avatarTop + dp(56));
+            MyChatListSize.scaleAvatar(storyParams.originalAvatarRect);
             for (int i = 0; i < thumbImage.length; ++i) {
                 thumbImage[i].setImageCoords(thumbLeft + (thumbSize + 2) * i, avatarTop + dp(31) + (twoLinesForName ? dp(20) : 0) - (!(useForceThreeLines || SharedConfig.useThreeLinesLayout) && tags != null && !tags.isEmpty() ? dp(9) : 0), dp(18), dp(18));
             }
@@ -2507,6 +2508,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 thumbLeft = avatarLeft + dp(56 + 11);
             }
             storyParams.originalAvatarRect.set(avatarLeft, avatarTop, avatarLeft + dp(52), avatarTop + dp(52));
+            MyChatListSize.scaleAvatar(storyParams.originalAvatarRect);
             for (int i = 0; i < thumbImage.length; ++i) {
                 thumbImage[i].setImageCoords(thumbLeft + (thumbSize + 2) * i, avatarTop + dp(30) + (twoLinesForName ? dp(20) : 0) - (!(useForceThreeLines || SharedConfig.useThreeLinesLayout) && tags != null && !tags.isEmpty() ? dp(9) : 0), dp(thumbSize), dp(thumbSize));
             }
