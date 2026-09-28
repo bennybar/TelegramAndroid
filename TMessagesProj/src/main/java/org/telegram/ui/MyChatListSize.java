@@ -27,6 +27,11 @@ public class MyChatListSize {
         return MessagesController.getGlobalMainSettings().getBoolean("chatListDividers", false);
     }
 
+    // iMessage-style: the divider stops at the same 15dp margin as the time, instead of touching the edge.
+    public static int dividerEndInset() {
+        return dividers() ? AndroidUtilities.dp(15) : 0;
+    }
+
     public static void toggle(String key) {
         MessagesController.getGlobalMainSettings().edit().putBoolean(key, !MessagesController.getGlobalMainSettings().getBoolean(key, false)).apply();
     }
