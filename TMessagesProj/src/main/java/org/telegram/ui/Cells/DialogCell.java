@@ -2753,6 +2753,14 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         if (twoLinesForName) {
             messageTop += dp(20);
         }
+        final int myLineGap = MyChatListSize.lineGapPx(); // extra space between the name and the preview
+        if (myLineGap != 0) {
+            messageTop += myLineGap;
+            messageNameTop += myLineGap;
+            for (int i = 0; i < thumbImage.length; ++i) {
+                thumbImage[i].setImageY(thumbImage[i].getImageY() + myLineGap);
+            }
+        }
         animatedEmojiStack2 = AnimatedEmojiSpan.update(AnimatedEmojiDrawable.CACHE_TYPE_MESSAGES, this, animatedEmojiStack2, messageNameLayout);
 
 
@@ -2816,7 +2824,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
                 if (thumbsCount > 0 && messageNameString != null) {
                     messageWidth += dp(5);
                 }
-                messageLayout = StaticLayoutEx.createStaticLayout(messageStringFinal, currentMessagePaint, messageWidth, align, 1.0f, dp(1), false, TextUtils.TruncateAt.END, messageWidth, messageNameString != null ? 1 : 2);
+                messageLayout = StaticLayoutEx.createStaticLayout(messageStringFinal, currentMessagePaint, messageWidth, align, 1.0f, dp(1) + MyChatListSize.lineGapPx(), false, TextUtils.TruncateAt.END, messageWidth, messageNameString != null ? 1 : 2);
             } else {
                 if (thumbsCount > 0) {
                     messageWidth += dp((thumbsCount * (thumbSize + 2) - 2) + 5);
