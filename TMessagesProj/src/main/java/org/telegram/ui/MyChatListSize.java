@@ -27,6 +27,10 @@ public class MyChatListSize {
         return MessagesController.getGlobalMainSettings().getBoolean("ticksUnderTime", false);
     }
 
+    public static boolean badgeBorder() {
+        return MessagesController.getGlobalMainSettings().getBoolean("badgeBorder", false);
+    }
+
     public static boolean badgeOnPhoto() {
         return MessagesController.getGlobalMainSettings().getBoolean("badgeOnPhoto", false);
     }
@@ -69,6 +73,13 @@ public class MyChatListSize {
         float left = cell.avatarImage.getImageX2() + AndroidUtilities.dp(2) * scale - width; // always the top-right corner
         badgeRect.set(left, top, left + width, top + height);
         float ring = AndroidUtilities.dp(2) * scale;
+        if (badgeBorder()) {
+            // Blue outer border around the white gap, so muted (grey) badges stand out too.
+            float border = AndroidUtilities.dp(1.5f) * scale;
+            float outer = ring + border;
+            badgeRingPaint.setColor(Theme.getColor(Theme.key_chats_unreadCounter));
+            canvas.drawRoundRect(badgeRect.left - outer, badgeRect.top - outer, badgeRect.right + outer, badgeRect.bottom + outer, height / 2 + outer, height / 2 + outer, badgeRingPaint);
+        }
         badgeRingPaint.setColor(Theme.getColor(Theme.key_windowBackgroundWhite));
         canvas.drawRoundRect(badgeRect.left - ring, badgeRect.top - ring, badgeRect.right + ring, badgeRect.bottom + ring, height / 2 + ring, height / 2 + ring, badgeRingPaint);
         badgePaint.setColor(Theme.getColor(muted ? Theme.key_chats_unreadCounterMuted : Theme.key_chats_unreadCounter));
