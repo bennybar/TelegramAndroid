@@ -4,6 +4,7 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.text.Layout;
+import android.text.TextDirectionHeuristics;
 import android.text.TextPaint;
 
 import org.telegram.messenger.AndroidUtilities;
@@ -38,7 +39,7 @@ public class MyIMessageStyle {
 
     // DialogCell constructor hook. Only the main chats list (cells with a DialogsActivity) gets the style.
     public static void applyToCell(DialogCell cell, DialogsActivity fragment) {
-        if (fragment != null && enabled() && !LocaleController.isRTL) {
+        if (fragment != null && enabled()) {
             cell.avatarStart = STYLED_AVATAR_START;
             cell.messagePaddingStart = STYLED_PADDING_START;
         }
@@ -50,7 +51,17 @@ public class MyIMessageStyle {
 
     // Previews end under the chevron instead of running to the cell edge.
     public static int previewTrim(DialogCell cell) {
-        return isStyled(cell) ? AndroidUtilities.dp(12) : 0;
+        return isStyled(cell) && !LocaleController.isRTL ? AndroidUtilities.dp(12) : 0;
+    }
+
+    // Like iOS "natural" alignment: follow the app's language, not the text's. English UI -> every preview starts
+    // on the left (Hebrew still reads right-to-left inside the line); Hebrew UI -> every preview starts on the right.
+    public static Layout.Alignment previewAlign(DialogCell cell, CharSequence text, Layout.Alignment align) {
+        if (!isStyled(cell) || text == null) {
+            return align;
+        }
+        boolean textRtl = TextDirectionHeuristics.FIRSTSTRONG_LTR.isRtl(text, 0, text.length());
+        return textRtl == LocaleController.isRTL ? Layout.Alignment.ALIGN_NORMAL : Layout.Alignment.ALIGN_OPPOSITE;
     }
 
     // How far to move the time left so the chevron fits after it.
@@ -71,13 +82,22 @@ public class MyIMessageStyle {
             chevronPaint.setStrokeJoin(Paint.Join.ROUND);
         }
         chevronPaint.setColor(timePaint.getColor());
-        float x = timeLayout.getWidth() + AndroidUtilities.dp(6);
         float y = timeLayout.getHeight() / 2f;
         float h = AndroidUtilities.dp(4);
         chevron.reset();
-        chevron.moveTo(x, y - h);
-        chevron.lineTo(x + h * 0.8f, y);
-        chevron.lineTo(x, y + h);
+        if (!LocaleController.isRTL) {
+            // After the time (and after the pinned pill, which ends 6dp past the time).
+            float x = timeLayout.getWidth() + AndroidUtilities.dp(cell.getIsPinned() ? 10 : 6);
+            chevron.moveTo(x, y - h);
+            chevron.lineTo(x + h * 0.8f, y);
+            chevron.lineTo(x, y + h);
+        } else {
+            // Mirrored: a left-pointing chevron before the time (before the pinned pill, which starts 20dp earlier).
+            float x = -AndroidUtilities.dp(cell.getIsPinned() ? 24 : 6);
+            chevron.moveTo(x, y - h);
+            chevron.lineTo(x - h * 0.8f, y);
+            chevron.lineTo(x, y + h);
+        }
         canvas.drawPath(chevron, chevronPaint);
     }
 
@@ -87,6 +107,7 @@ public class MyIMessageStyle {
             dotPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         }
         dotPaint.setColor(Theme.getColor(muted ? Theme.key_chats_unreadCounterMuted : Theme.key_chats_unreadCounter));
-        canvas.drawCircle(AndroidUtilities.dp(11.5f), cell.avatarImage.getCenterY(), AndroidUtilities.dp(5), dotPaint);
+        float x = LocaleController.isRTL ? cell.getMeasuredWidth() - AndroidUtilities.dp(11.5f) : AndroidUtilities.dp(11.5f);
+        canvas.drawCircle(x, cell.avatarImage.getCenterY(), AndroidUtilities.dp(5), dotPaint);
     }
 }
