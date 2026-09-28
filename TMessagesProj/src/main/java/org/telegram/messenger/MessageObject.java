@@ -8491,6 +8491,7 @@ public class MessageObject {
         if (maxWidth == 0) {
             final boolean needDrawAvatarInternal = needDrawAvatarInternal();
             maxWidth = generatedWithMinSize - dp(type == TYPE_ARTICLE ? 40 : 80);
+            maxWidth += org.telegram.ui.MyChatTweaks.extraTextWidth(generatedWithMinSize);
             if (sideMenuEnabled) {
                 maxWidth -= dp(64);
             } else if (needDrawAvatarInternal && !isOutOwner() && !messageOwner.isThreadMessage) {

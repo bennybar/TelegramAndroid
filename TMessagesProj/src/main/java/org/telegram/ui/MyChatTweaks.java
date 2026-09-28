@@ -1,0 +1,42 @@
+package org.telegram.ui;
+
+import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.MessagesController;
+
+// In-chat toggles: double-tap a message to reply, wider message bubbles.
+public class MyChatTweaks {
+
+    public static final String[] BUBBLE_LABELS = {"Default", "91%", "93%", "95%"};
+    private static final float[] BUBBLE_WIDTHS = {0f, 0.91f, 0.93f, 0.95f};
+    // Bubble padding plus the margin on the bubble's own side, inside Telegram's stock "screen width - 80dp" text width.
+    private static final int BUBBLE_CHROME_DP = 39;
+
+    public static boolean doubleTapReply() {
+        return MessagesController.getGlobalMainSettings().getBoolean("doubleTapReply", false);
+    }
+
+    public static void toggleDoubleTapReply() {
+        MessagesController.getGlobalMainSettings().edit().putBoolean("doubleTapReply", !doubleTapReply()).apply();
+    }
+
+    public static int bubbleIndex() {
+        int index = MessagesController.getGlobalMainSettings().getInt("bubbleWidth", 0);
+        return Math.max(0, Math.min(BUBBLE_WIDTHS.length - 1, index));
+    }
+
+    public static void setBubbleIndex(int index) {
+        MessagesController.getGlobalMainSettings().edit().putInt("bubbleWidth", index).apply();
+    }
+
+    // MessageObject.getMaxMessageTextWidth hook: extra text width so bubbles can reach the chosen share of the
+    // screen. Only ever widens (the empty gap on the far side shrinks); avatar/share-button room is kept.
+    public static int extraTextWidth(int parentWidth) {
+        float share = BUBBLE_WIDTHS[bubbleIndex()];
+        if (share == 0f) {
+            return 0;
+        }
+        int stockGap = AndroidUtilities.dp(80 - BUBBLE_CHROME_DP);
+        int wantedGap = (int) (parentWidth * (1f - share));
+        return Math.max(0, stockGap - wantedGap);
+    }
+}

@@ -124,6 +124,7 @@ public class MySettings {
     private static final int ID_HIDE_PROFILE_TAB = 209;
     private static final int ID_COMPACT_SEARCH = 210;
     private static final int ID_PINNED_TINT = 211;
+    private static final int ID_DOUBLE_TAP_REPLY = 212;
 
     public static void filterItems(ArrayList<UItem> items) {
         addOwnItems(items);
@@ -170,6 +171,13 @@ public class MySettings {
             .setChecked(MyUiTweaks.md3TabBar()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_HIDE_PROFILE_TAB, "Hide Profile tab", "Your profile stays reachable from Settings. Kept while the Calls tab is shown.")
             .setChecked(MyUiTweaks.hideProfileTab()).setMultiline(true));
+        items.add(next++, UItem.asShadow(null));
+        items.add(next++, UItem.asHeader("Inside chats"));
+        items.add(next++, UItem.asButtonCheck(ID_DOUBLE_TAP_REPLY, "Double-tap to reply", "Double-tap a message to reply to it, instead of sending a reaction.")
+            .setChecked(MyChatTweaks.doubleTapReply()).setMultiline(true));
+        items.add(next++, UItem.asShadow(null));
+        items.add(next++, UItem.asHeader("Message bubble width"));
+        items.add(next++, UItem.asSlideView(MyChatTweaks.BUBBLE_LABELS, MyChatTweaks.bubbleIndex(), MyChatTweaks::setBubbleIndex));
         items.add(next, UItem.asShadow("Reopen Tegram after changing any of these."));
         items.add(UItem.asHeader("Google push"));
         String relay = MyFcmDistributor.relayUrl();
@@ -179,6 +187,11 @@ public class MySettings {
     }
 
     public static boolean onClick(BaseFragment fragment, UItem item, Runnable refresh) {
+        if (item.id == ID_DOUBLE_TAP_REPLY) {
+            MyChatTweaks.toggleDoubleTapReply();
+            refresh.run();
+            return true;
+        }
         if (item.id == ID_MD3_TAB_BAR || item.id == ID_HIDE_PROFILE_TAB || item.id == ID_COMPACT_SEARCH || item.id == ID_PINNED_TINT) {
             MyUiTweaks.toggle(item.id == ID_MD3_TAB_BAR ? "md3TabBar" : item.id == ID_HIDE_PROFILE_TAB ? "hideProfileTab" : item.id == ID_COMPACT_SEARCH ? "compactSearch" : "pinnedTint");
             refresh.run();

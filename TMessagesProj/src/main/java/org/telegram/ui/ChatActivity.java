@@ -2065,6 +2065,13 @@ public class ChatActivity extends BaseFragment implements
 
         @Override
         public boolean hasDoubleTap(View view, int position) {
+            if (MyChatTweaks.doubleTapReply()) {
+                // Double-tap replies instead of reacting, wherever the message field is available.
+                return view instanceof ChatMessageCell && ((ChatMessageCell) view).getPrimaryMessageObject() != null
+                    && ((ChatMessageCell) view).getPrimaryMessageObject().getId() > 0
+                    && chatActivityEnterView != null && chatActivityEnterView.getVisibility() == View.VISIBLE
+                    && !actionBar.isActionModeShowed() && !isInScheduleMode();
+            }
             if (MessagesController.getGlobalMainSettings().getBoolean("disableQuickReaction", false)) {
                 return false;
             }
@@ -2094,6 +2101,12 @@ public class ChatActivity extends BaseFragment implements
 
         @Override
         public void onDoubleTap(View view, int position, float x, float y) {
+            if (MyChatTweaks.doubleTapReply()) {
+                if (view instanceof ChatMessageCell && getParentActivity() != null) {
+                    showFieldPanelForReply(((ChatMessageCell) view).getPrimaryMessageObject());
+                }
+                return;
+            }
             if (getParentActivity() == null || isSecretChat() || isInScheduleMode() || isInPreviewMode() || isQuickRepliesOrWelcomeMessagesMode()) {
                 return;
             }
