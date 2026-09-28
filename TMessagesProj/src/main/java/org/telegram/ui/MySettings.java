@@ -10,6 +10,7 @@ import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.R;
 
 import org.telegram.messenger.MyFcmDistributor;
+import org.telegram.messenger.MyFonts;
 import org.telegram.messenger.forkgram.ForkDialogs;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.Components.BulletinFactory;
@@ -117,6 +118,7 @@ public class MySettings {
     private static final int ID_GOOGLE_PUSH_RELAY = 201;
     private static final int ID_CATCH_UP_MARKS_READ = 202;
     private static final int ID_DEVICE_FONT = 204;
+    private static final int ID_GOOGLE_SANS = 205;
 
     public static void filterItems(ArrayList<UItem> items) {
         addOwnItems(items);
@@ -144,7 +146,9 @@ public class MySettings {
             items.add(next++, UItem.asButtonCheck(ID_DEVICE_FONT, "Use device font", "Bold text (names, titles) uses your phone's font instead of Telegram's Roboto.")
                 .setChecked(SharedConfig.useSystemBoldFont).setMultiline(true));
         }
-        items.add(next, UItem.asShadow("Reopen Tegram after changing this."));
+        items.add(next++, UItem.asButtonCheck(ID_GOOGLE_SANS, "Use Google Sans", "All text in Google's font, bundled with the app (Latin and Hebrew).")
+            .setChecked(MyFonts.googleSans()).setMultiline(true));
+        items.add(next, UItem.asShadow("Reopen Tegram after changing these. Only one font choice can be on."));
         items.add(UItem.asHeader("Google push"));
         String relay = MyFcmDistributor.relayUrl();
         items.add(UItem.asSettingsCell(ID_GOOGLE_PUSH_RELAY, "Google push relay", relay.isEmpty() ? "Not set" : Uri.parse(relay).getHost()));
@@ -153,7 +157,19 @@ public class MySettings {
     }
 
     public static boolean onClick(BaseFragment fragment, UItem item, Runnable refresh) {
+        if (item.id == ID_GOOGLE_SANS) {
+            MyFonts.setGoogleSans(!MyFonts.googleSans());
+            if (MyFonts.googleSans() && SharedConfig.useSystemBoldFont) {
+                SharedConfig.toggleUseSystemBoldFont();
+            }
+            refresh.run();
+            BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply.").show();
+            return true;
+        }
         if (item.id == ID_DEVICE_FONT) {
+            if (!SharedConfig.useSystemBoldFont && MyFonts.googleSans()) {
+                MyFonts.setGoogleSans(false);
+            }
             SharedConfig.toggleUseSystemBoldFont();
             refresh.run();
             BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply.").show();
