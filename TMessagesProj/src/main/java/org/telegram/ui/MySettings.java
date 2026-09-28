@@ -229,6 +229,22 @@ public class MySettings {
             + "After setting it, pick this app as the UnifiedPush distributor in Notifications and Sounds."));
     }
 
+    // SettingsBackup hook: also back up Telegram's notification settings, other accounts' settings and this
+    // build's own preference files (AI, Google push relay, reminders).
+    public static java.util.List<String> extraBackupPrefs() {
+        java.util.List<String> names = new ArrayList<>(Arrays.asList("Notifications", "myai", "mypush", "myreminders"));
+        for (int account = 1; account < 10; account++) {
+            names.add("mainconfig" + account);
+            names.add("Notifications" + account);
+        }
+        return names;
+    }
+
+    // The OpenAI key stays out of the (plain text) backup file.
+    public static boolean skipInBackup(String prefsName, String key) {
+        return "myai".equals(prefsName) && "apiKey".equals(key);
+    }
+
     public static boolean onClick(BaseFragment fragment, UItem item, Runnable refresh) {
         if (item.id == ID_BADGE_ON_PHOTO || item.id == ID_TICKS_UNDER_TIME || item.id == ID_BADGE_BORDER) {
             MyChatListSize.toggle(item.id == ID_BADGE_ON_PHOTO ? "badgeOnPhoto" : item.id == ID_TICKS_UNDER_TIME ? "ticksUnderTime" : "badgeBorder");

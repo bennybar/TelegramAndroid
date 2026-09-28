@@ -18,7 +18,7 @@ object SettingsBackup {
         "playback_speed",
         "camera",
         "voippipconfig"
-    )
+    ) + org.telegram.ui.MySettings.extraBackupPrefs()
 
     private fun isAllowed(name: String?) = ALLOWED_PREFS.any { it == name }
 
@@ -36,6 +36,9 @@ object SettingsBackup {
             }
             val fileObject = JSONObject()
             for (entry in all.entries) {
+                if (org.telegram.ui.MySettings.skipInBackup(name, entry.key)) {
+                    continue
+                }
                 val value = entry.value
                 val typed = JSONObject()
                 when (value) {
