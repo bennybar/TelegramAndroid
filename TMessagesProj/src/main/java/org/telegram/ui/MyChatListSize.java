@@ -1,6 +1,9 @@
 package org.telegram.ui;
 
 import android.graphics.RectF;
+import android.view.ViewGroup;
+
+import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
@@ -27,7 +30,7 @@ public class MyChatListSize {
     }
 
     public static int dividerStartInset(int stock) {
-        return dividers() ? AndroidUtilities.dp(15 + sidePaddingDp()) : stock;
+        return dividers() ? AndroidUtilities.dp(15) : stock;
     }
 
     public static void toggle(String key) {
@@ -50,10 +53,15 @@ public class MyChatListSize {
         return SIDE_PADDING_DP[sideIndex()];
     }
 
-    // DialogCell.onMeasure hook: the row is narrower by the padding, so the time, badges, previews and divider
-    // all move in from the right edge; applyToCell moves the photo and text in from the left by the same amount.
-    public static int sidePaddingPx() {
-        return AndroidUtilities.dp(sidePaddingDp());
+    // DialogCell.setLayoutParams hook: equal margins on both sides of each chat list row (the list honours them),
+    // so everything in the row moves in together in both the normal and the mirrored layout.
+    public static ViewGroup.LayoutParams withSideMargins(ViewGroup.LayoutParams params) {
+        if (params instanceof RecyclerView.LayoutParams) {
+            int margin = AndroidUtilities.dp(sidePaddingDp());
+            ((RecyclerView.LayoutParams) params).leftMargin = margin;
+            ((RecyclerView.LayoutParams) params).rightMargin = margin;
+        }
+        return params;
     }
 
     public static int avatarIndex() {
@@ -111,10 +119,8 @@ public class MyChatListSize {
             cell.heightDefault = Math.round(cell.heightDefault + extra * 36);    // name + one preview line
             cell.heightThreeLines = Math.round(cell.heightThreeLines + extra * 44); // name + two preview lines
         }
-        if (!org.telegram.messenger.MyRtl.mirrorList()) {
-            // Mirrored rows keep the photo on the right, where the narrower row already adds the padding.
-            cell.avatarStart += sidePaddingDp();
-            cell.messagePaddingStart += sidePaddingDp();
+        if (org.telegram.messenger.MyRtl.mirrorList()) {
+            cell.messagePaddingStart += 6; // a little more room between the photo and the text in mirrored rows
         }
         float avatar = avatarScale();
         if (avatar != 1f) {
