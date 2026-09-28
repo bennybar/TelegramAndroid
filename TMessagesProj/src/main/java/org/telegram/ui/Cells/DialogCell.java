@@ -2302,10 +2302,11 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             timeWidth = (int) Math.ceil(tp.measureText(timeString));
             timeLayout = new StaticLayout(timeString, tp, timeWidth, Layout.Alignment.ALIGN_NORMAL, 1.0f, 0.0f, false);
             timeWidth += dp(getIsPinned() ? 24 : 0);
+            timeWidth += MyIMessageStyle.timeShift(this);
             if (!LocaleController.isRTL) {
-                timeLeft = getMeasuredWidth() - dp(15) - timeWidth - MyIMessageStyle.timeShift(this);
+                timeLeft = getMeasuredWidth() - dp(15) - timeWidth;
             } else {
-                timeLeft = dp(15);
+                timeLeft = dp(15) + MyIMessageStyle.timeShift(this);
             }
         } else {
             timeWidth = 0;
@@ -2793,6 +2794,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             }
 
             Layout.Alignment align = isForum && LocaleController.isRTL ? Layout.Alignment.ALIGN_OPPOSITE : Layout.Alignment.ALIGN_NORMAL;
+            align = MyIMessageStyle.previewAlign(this, messageStringFinal, align);
             if ((useForceThreeLines || SharedConfig.useThreeLinesLayout) && !hasTags()) {
                 if (thumbsCount > 0 && messageNameString != null) {
                     messageWidth += dp(5);
