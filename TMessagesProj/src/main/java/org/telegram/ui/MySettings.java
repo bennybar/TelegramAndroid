@@ -160,6 +160,9 @@ public class MySettings {
         items.add(next++, UItem.asHeader("Chat list text size"));
         items.add(next++, UItem.asSlideView(MyChatListSize.LABELS, MyChatListSize.index(), MyChatListSize::setIndex));
         items.add(next++, UItem.asShadow(null));
+        items.add(next++, UItem.asHeader("Chat list side padding"));
+        items.add(next++, UItem.asSlideView(MyChatListSize.SIDE_LABELS, MyChatListSize.sideIndex(), MyChatListSize::setSideIndex));
+        items.add(next++, UItem.asShadow(null));
         items.add(next++, UItem.asHeader("Chat list photo size"));
         items.add(next++, UItem.asSlideView(MyChatListSize.AVATAR_LABELS, MyChatListSize.avatarIndex(), MyChatListSize::setAvatarIndex));
         items.add(next++, UItem.asShadow(null));

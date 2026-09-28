@@ -27,11 +27,33 @@ public class MyChatListSize {
     }
 
     public static int dividerStartInset(int stock) {
-        return dividers() ? AndroidUtilities.dp(15) : stock;
+        return dividers() ? AndroidUtilities.dp(15 + sidePaddingDp()) : stock;
     }
 
     public static void toggle(String key) {
         MessagesController.getGlobalMainSettings().edit().putBoolean(key, !MessagesController.getGlobalMainSettings().getBoolean(key, false)).apply();
+    }
+
+    public static final String[] SIDE_LABELS = {"Default", "+4", "+8", "+12", "+16"};
+    private static final int[] SIDE_PADDING_DP = {0, 4, 8, 12, 16};
+
+    public static int sideIndex() {
+        int index = MessagesController.getGlobalMainSettings().getInt("chatListSidePadding", 0);
+        return Math.max(0, Math.min(SIDE_PADDING_DP.length - 1, index));
+    }
+
+    public static void setSideIndex(int index) {
+        MessagesController.getGlobalMainSettings().edit().putInt("chatListSidePadding", index).apply();
+    }
+
+    private static int sidePaddingDp() {
+        return SIDE_PADDING_DP[sideIndex()];
+    }
+
+    // DialogCell.onMeasure hook: the row is narrower by the padding, so the time, badges, previews and divider
+    // all move in from the right edge; applyToCell moves the photo and text in from the left by the same amount.
+    public static int sidePaddingPx() {
+        return AndroidUtilities.dp(sidePaddingDp());
     }
 
     public static int avatarIndex() {
@@ -89,6 +111,8 @@ public class MyChatListSize {
             cell.heightDefault = Math.round(cell.heightDefault + extra * 36);    // name + one preview line
             cell.heightThreeLines = Math.round(cell.heightThreeLines + extra * 44); // name + two preview lines
         }
+        cell.avatarStart += sidePaddingDp();
+        cell.messagePaddingStart += sidePaddingDp();
         float avatar = avatarScale();
         if (avatar != 1f) {
             // Text starts after the avatar: move it by the avatar's growth (56dp two-line avatar as reference).

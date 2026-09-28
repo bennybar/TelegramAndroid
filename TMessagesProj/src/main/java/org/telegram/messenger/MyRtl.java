@@ -47,6 +47,11 @@ public class MyRtl {
         return Math.max(0, messageLeft + messageWidth - (cellWidth - AndroidUtilities.dp(15)));
     }
 
+    // DialogCell hook: extra room between a preview's leading thumbnail and its text (4dp) for RTL previews.
+    public static int thumbExtraGap() {
+        return preferRtl() ? AndroidUtilities.dp(4) : 0;
+    }
+
     // ChatActivityEnterView hook: the message field follows the same rule while typing.
     public static void applyToInput(TextView input) {
         if (preferRtl()) {
