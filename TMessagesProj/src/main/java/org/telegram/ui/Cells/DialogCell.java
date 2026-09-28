@@ -1017,6 +1017,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        final boolean myPrevRtl = org.telegram.messenger.MyRtl.beginMirror(); // mirrored chat list rows
+        try {
         if (emojiStatusView != null) {
             emojiStatusView.measure(
                 MeasureSpec.makeMeasureSpec(dp(22), MeasureSpec.EXACTLY),
@@ -1037,6 +1039,9 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec) - MyChatListSize.sidePaddingPx(), computeHeight());
         topClip = 0;
         bottomClip = getMeasuredHeight();
+        } finally {
+            org.telegram.messenger.MyRtl.endMirror(myPrevRtl);
+        }
     }
 
     private int computeHeight() {
@@ -1083,6 +1088,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     int lastSize;
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        final boolean myPrevRtl = org.telegram.messenger.MyRtl.beginMirror(); // mirrored chat list rows
+        try {
         if (currentDialogId == 0 && customDialog == null) {
             return;
         }
@@ -1110,6 +1117,9 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             } catch (Exception e) {
                 FileLog.e(e);
             }
+        }
+        } finally {
+            org.telegram.messenger.MyRtl.endMirror(myPrevRtl);
         }
     }
 
@@ -1272,6 +1282,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     private static final float BADGE_DRAWABLE_OFFSET = (BADGE_SIZE - BADGE_DRAWABLE_SIZE) / 2f;
 
     public void buildLayout() {
+        final boolean myPrevRtl = org.telegram.messenger.MyRtl.beginMirror(); // mirrored chat list rows
+        try {
         if (isTransitionSupport) {
             return;
         }
@@ -3024,6 +3036,9 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             }
         }
         updateThumbsPosition();
+        } finally {
+            org.telegram.messenger.MyRtl.endMirror(myPrevRtl);
+        }
     }
 
     public void setTitleOverride(String s) {
@@ -3854,6 +3869,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     @SuppressLint("DrawAllocation")
     @Override
     protected void onDraw(Canvas canvas) {
+        final boolean myPrevRtl = org.telegram.messenger.MyRtl.beginMirror(); // mirrored chat list rows
+        try {
         if (currentDialogId == 0 && customDialog == null) {
             return;
         }
@@ -5058,6 +5075,9 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         if (needInvalidate) {
             invalidate();
         }
+        } finally {
+            org.telegram.messenger.MyRtl.endMirror(myPrevRtl);
+        }
     }
 
     private TextPaint getTimeTextPaint() {
@@ -6238,6 +6258,8 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
 
     @Override
     public boolean onTouchEvent(MotionEvent event) {
+        final boolean myPrevRtl = org.telegram.messenger.MyRtl.beginMirror(); // mirrored chat list rows
+        try {
         if (rightFragmentOpenedProgress == 0 && !isTopic && !isShareToStoryCell && storyParams.checkOnTouchEvent(event, this)) {
             return true;
         }
@@ -6263,6 +6285,9 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             }
         }
         return super.onTouchEvent(event);
+        } finally {
+            org.telegram.messenger.MyRtl.endMirror(myPrevRtl);
+        }
     }
 
 

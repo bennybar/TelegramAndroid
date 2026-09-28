@@ -18,6 +18,28 @@ public class MyRtl {
         MessagesController.getGlobalMainSettings().edit().putBoolean("preferRtl", !preferRtl()).apply();
     }
 
+    public static boolean mirrorList() {
+        return MessagesController.getGlobalMainSettings().getBoolean("mirrorChatList", false);
+    }
+
+    public static void toggleMirrorList() {
+        MessagesController.getGlobalMainSettings().edit().putBoolean("mirrorChatList", !mirrorList()).apply();
+    }
+
+    // DialogCell hooks around measure/layout/draw/touch: lay chat rows out with Telegram's own right-to-left code
+    // (avatar right, time left, text flush right) while the rest of the app stays in the English layout.
+    public static boolean beginMirror() {
+        boolean previous = LocaleController.isRTL;
+        if (mirrorList()) {
+            LocaleController.isRTL = true;
+        }
+        return previous;
+    }
+
+    public static void endMirror(boolean previous) {
+        LocaleController.isRTL = previous;
+    }
+
     // MessageObject.makeStaticLayout hook (message bubbles). FIRSTSTRONG_LTR is StaticLayout's own default.
     public static TextDirectionHeuristic textDirection() {
         return preferRtl() ? TextDirectionHeuristics.ANYRTL_LTR : TextDirectionHeuristics.FIRSTSTRONG_LTR;
