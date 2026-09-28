@@ -1,5 +1,6 @@
 package org.telegram.messenger;
 
+import android.text.Layout;
 import android.text.TextDirectionHeuristic;
 import android.text.TextDirectionHeuristics;
 import android.view.View;
@@ -20,6 +21,16 @@ public class MyRtl {
     // MessageObject.makeStaticLayout hook (message bubbles). FIRSTSTRONG_LTR is StaticLayout's own default.
     public static TextDirectionHeuristic textDirection() {
         return preferRtl() ? TextDirectionHeuristics.ANYRTL_LTR : TextDirectionHeuristics.FIRSTSTRONG_LTR;
+    }
+
+    // DialogCell hook (LTR app): Telegram shifts each preview left so its longest line starts at the text column.
+    // For a right-to-left preview that left-anchors the block, so every row ends at a different right edge.
+    // Keep RTL previews right-aligned instead, all ending at the same edge.
+    public static float previewShift(Layout layout, float shift) {
+        if (preferRtl() && layout.getLineCount() > 0 && layout.getParagraphDirection(0) == Layout.DIR_RIGHT_TO_LEFT) {
+            return 0;
+        }
+        return shift;
     }
 
     // ChatActivityEnterView hook: the message field follows the same rule while typing.
