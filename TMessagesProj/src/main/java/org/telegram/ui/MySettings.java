@@ -148,7 +148,10 @@ public class MySettings {
         }
         items.add(next++, UItem.asButtonCheck(ID_GOOGLE_SANS, "Use Google Sans", "All text in Google's font, bundled with the app (Latin and Hebrew).")
             .setChecked(MyFonts.googleSans()).setMultiline(true));
-        items.add(next, UItem.asShadow("Reopen Tegram after changing these. Only one font choice can be on."));
+        items.add(next++, UItem.asShadow("Only one font choice can be on."));
+        items.add(next++, UItem.asHeader("Chat list text size"));
+        items.add(next++, UItem.asSlideView(MyChatListSize.LABELS, MyChatListSize.index(), MyChatListSize::setIndex));
+        items.add(next, UItem.asShadow("Reopen Tegram after changing any of these."));
         items.add(UItem.asHeader("Google push"));
         String relay = MyFcmDistributor.relayUrl();
         items.add(UItem.asSettingsCell(ID_GOOGLE_PUSH_RELAY, "Google push relay", relay.isEmpty() ? "Not set" : Uri.parse(relay).getHost()));

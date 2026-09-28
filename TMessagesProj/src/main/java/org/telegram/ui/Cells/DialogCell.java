@@ -114,6 +114,7 @@ import org.telegram.ui.Components.Premium.PremiumGradient;
 import org.telegram.ui.Components.PullForegroundDrawable;
 import org.telegram.ui.Components.QuoteSpan;
 import org.telegram.ui.Components.RLottieDrawable;
+import org.telegram.ui.MyChatListSize;
 import org.telegram.ui.Components.Reactions.ReactionsLayoutInBubble;
 import org.telegram.ui.Components.StaticLayoutEx;
 import org.telegram.ui.Components.StatusDrawable;
@@ -720,6 +721,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         emojiStatus = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(emojiStatusView, dp(22));
         botVerification = new AnimatedEmojiDrawable.SwapAnimatedEmojiDrawable(this, dp(17));
         avatarImage.setAllowLoadingOnAttachedOnly(true);
+        MyChatListSize.applyToCell(this);
     }
 
     @Override
@@ -1298,6 +1300,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             paintIndex = 0;
             thumbSize = 19;
         }
+        MyChatListSize.scalePaints();
 
         currentDialogFolderDialogsCount = 0;
         CharSequence nameString = "";
