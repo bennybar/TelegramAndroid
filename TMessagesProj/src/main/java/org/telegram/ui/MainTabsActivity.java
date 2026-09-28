@@ -316,12 +316,11 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
         tabs = new GlassTabView[5];
         tabs[INDEX_CHATS] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.CHATS, R.string.MainTabsChats);
-        tabs[INDEX_CONTACTS] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.CONTACTS, R.string.MainTabsContacts);
+        tabs[INDEX_CONTACTS] = MyAiTab.createTab(context, resourceProvider);
         tabs[INDEX_SETTINGS] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.SETTINGS, R.string.Settings);
         tabs[INDEX_CALLS] = GlassTabView.createMainTab(context, resourceProvider, GlassTabView.TabAnimation.CALLS, R.string.MainTabsCalls);
         tabs[INDEX_PROFILE] = GlassTabView.createAvatar(context, resourceProvider, currentAccount, R.string.MainTabsProfile);
         tabs[INDEX_CHATS].setOnLongClickListener(this::openFoldersSelector);
-        tabs[INDEX_CONTACTS].setOnLongClickListener(this::openContactsSelector);
         tabs[INDEX_CALLS].setOnLongClickListener(this::openCallsSelector);
         tabs[INDEX_PROFILE].setOnLongClickListener(this::openAccountSelector);
 
@@ -354,7 +353,7 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
             tabsView.addView(tabs[index]);
             tabsView.setViewVisible(view, true, false);
         }
-        MyAiTab.install(this, context, resourceProvider, tabsView, tabs[INDEX_SETTINGS], tabs[INDEX_CONTACTS], tabs[INDEX_PROFILE], getUserConfig().showCallsTab, () -> selectTab(viewPager.getCurrentPosition(), false));
+        MyAiTab.install(tabsView, tabs[INDEX_PROFILE], getUserConfig().showCallsTab);
         checkUi_callTabVisible(getUserConfig().showCallsTab, false);
 
         selectTab(viewPager.getCurrentPosition(), false);
@@ -833,6 +832,9 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
 
     @Override
     protected BaseFragment createBaseFragmentAt(int position) {
+        if (position == POSITION_CONTACTS) {
+            return MyAiTab.createPage();
+        }
         if (position == POSITION_CONTACTS) {
             Bundle args = new Bundle();
             args.putBoolean("needPhonebook", true);
