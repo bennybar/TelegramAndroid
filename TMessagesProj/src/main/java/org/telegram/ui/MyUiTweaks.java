@@ -138,7 +138,8 @@ public class MyUiTweaks {
             pinnedPaint = new Paint();
         }
         pinnedPaint.setColor(Theme.multAlpha(Theme.getColor(Theme.key_chats_unreadCounter), 0.07f));
-        canvas.drawRect(0, 0, cell.getMeasuredWidth(), cell.getMeasuredHeight(), pinnedPaint);
+        int shift = MyChatListSize.rowShiftPx(); // drawn inside the row-spacing translation; cover the real row
+        canvas.drawRect(0, -shift, cell.getMeasuredWidth(), cell.getMeasuredHeight() - shift, pinnedPaint);
     }
 
     public static boolean showPinnedPill(DialogCell cell) {
