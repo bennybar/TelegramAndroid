@@ -23,6 +23,10 @@ public class MyChatListSize {
     public static final String[] AVATAR_LABELS = {"80%", "90%", "100%", "110%", "120%"};
     private static final float[] AVATAR_SCALES = {0.8f, 0.9f, 1f, 1.1f, 1.2f};
 
+    public static boolean ticksUnderTime() {
+        return MessagesController.getGlobalMainSettings().getBoolean("ticksUnderTime", false);
+    }
+
     public static boolean badgeOnPhoto() {
         return MessagesController.getGlobalMainSettings().getBoolean("badgeOnPhoto", false);
     }
