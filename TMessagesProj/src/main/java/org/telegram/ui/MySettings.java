@@ -151,6 +151,9 @@ public class MySettings {
         items.add(next++, UItem.asShadow("Only one font choice can be on."));
         items.add(next++, UItem.asHeader("Chat list text size"));
         items.add(next++, UItem.asSlideView(MyChatListSize.LABELS, MyChatListSize.index(), MyChatListSize::setIndex));
+        items.add(next++, UItem.asShadow(null));
+        items.add(next++, UItem.asHeader("Chat list photo size"));
+        items.add(next++, UItem.asSlideView(MyChatListSize.AVATAR_LABELS, MyChatListSize.avatarIndex(), MyChatListSize::setAvatarIndex));
         items.add(next, UItem.asShadow("Reopen Tegram after changing any of these."));
         items.add(UItem.asHeader("Google push"));
         String relay = MyFcmDistributor.relayUrl();

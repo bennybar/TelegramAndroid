@@ -1,6 +1,9 @@
 package org.telegram.ui;
 
+import android.graphics.RectF;
+
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessagesController;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.DialogCell;
@@ -11,6 +14,43 @@ public class MyChatListSize {
 
     public static final String[] LABELS = {"90%", "100%", "105%", "110%", "115%"};
     private static final float[] SCALES = {0.9f, 1f, 1.05f, 1.1f, 1.15f};
+    public static final String[] AVATAR_LABELS = {"80%", "90%", "100%", "110%", "120%"};
+    private static final float[] AVATAR_SCALES = {0.8f, 0.9f, 1f, 1.1f, 1.2f};
+
+    public static int avatarIndex() {
+        int index = MessagesController.getGlobalMainSettings().getInt("chatListAvatarSize", 2);
+        return Math.max(0, Math.min(AVATAR_SCALES.length - 1, index));
+    }
+
+    public static void setAvatarIndex(int index) {
+        MessagesController.getGlobalMainSettings().edit().putInt("chatListAvatarSize", index).apply();
+    }
+
+    private static float avatarScale() {
+        return AVATAR_SCALES[avatarIndex()];
+    }
+
+    // buildLayout hook, right after the stock avatar rect is set: resize around its center, keeping the
+    // outer edge (left, or right in RTL) where it was. The text column was moved by applyToCell to match.
+    public static void scaleAvatar(RectF rect) {
+        float s = avatarScale();
+        if (s == 1f) {
+            return;
+        }
+        float size = rect.width() * s;
+        float centerY = rect.centerY();
+        if (LocaleController.isRTL) {
+            rect.left = rect.right - size;
+        } else {
+            rect.right = rect.left + size;
+        }
+        if (s > 1f) {
+            rect.bottom = rect.top + size; // grow down; applyToCell made the row taller by the same amount
+        } else {
+            rect.top = centerY - size / 2f;
+            rect.bottom = centerY + size / 2f;
+        }
+    }
 
     public static int index() {
         int index = MessagesController.getGlobalMainSettings().getInt("chatListTextSize", 1);
@@ -31,6 +71,14 @@ public class MyChatListSize {
         if (extra != 0) {
             cell.heightDefault = Math.round(cell.heightDefault + extra * 36);    // name + one preview line
             cell.heightThreeLines = Math.round(cell.heightThreeLines + extra * 44); // name + two preview lines
+        }
+        float avatar = avatarScale();
+        if (avatar != 1f) {
+            // Text starts after the avatar: move it by the avatar's growth (56dp two-line avatar as reference).
+            cell.messagePaddingStart = Math.round(cell.messagePaddingStart + 56 * (avatar - 1f));
+            // Keep the stock gap above and below the avatar (11dp two-line, 9dp three-line).
+            cell.heightDefault = Math.max(cell.heightDefault, Math.round(56 * avatar) + 22);
+            cell.heightThreeLines = Math.max(cell.heightThreeLines, Math.round(52 * avatar) + 18);
         }
     }
 
