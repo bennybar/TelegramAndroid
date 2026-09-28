@@ -18,7 +18,9 @@ git fetch upstream
 git checkout "$BRANCH"
 git rebase "$UPSTREAM"
 git submodule update --init --recursive --depth 1
-git push --force-with-lease origin "$BRANCH"
+# origin = private Kenes repo (master); github = public fork, which keeps the GPL source next to the public APKs.
+git push --force-with-lease origin "$BRANCH:master"
+git push --force-with-lease github "$BRANCH"
 
 echo "Done. My commits on top of $UPSTREAM:"
 git log --oneline "$UPSTREAM..HEAD"
