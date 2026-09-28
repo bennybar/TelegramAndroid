@@ -1027,11 +1027,11 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             );
         }
         if (isTopic) {
-            setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec) - MyChatListSize.sidePaddingPx(), dp((useForceThreeLines || SharedConfig.useThreeLinesLayout ? heightThreeLines : heightDefault) + (hasTags() && (!(useForceThreeLines || SharedConfig.useThreeLinesLayout) || isForumCell()) ? (isForumCell() ? addForumHeightForTags : addHeightForTags) : 0)) + (useSeparator ? 1 : 0));
+            setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), dp((useForceThreeLines || SharedConfig.useThreeLinesLayout ? heightThreeLines : heightDefault) + (hasTags() && (!(useForceThreeLines || SharedConfig.useThreeLinesLayout) || isForumCell()) ? (isForumCell() ? addForumHeightForTags : addHeightForTags) : 0)) + (useSeparator ? 1 : 0));
             checkTwoLinesForName();
         }
 
-        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec) - MyChatListSize.sidePaddingPx(), computeHeight());
+        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), computeHeight());
         topClip = 0;
         bottomClip = getMeasuredHeight();
         } finally {
@@ -1128,6 +1128,11 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
 
     public boolean getIsMuted() {
         return dialogMuted;
+    }
+
+    @Override
+    public void setLayoutParams(android.view.ViewGroup.LayoutParams params) {
+        super.setLayoutParams(MyChatListSize.withSideMargins(params));
     }
 
     public boolean getIsPinned() {
