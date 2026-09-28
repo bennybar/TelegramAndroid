@@ -6610,7 +6610,7 @@ public class MessageObject {
         isRoundVideoCached = 0;
         if (isSponsored()) {
             type = TYPE_TEXT;
-        } else if (channelJoined) {
+        } else if (channelJoined && !org.telegram.ui.MyChatTweaks.hideSimilarChannels()) {
             contentType = 0;
             type = TYPE_JOINED_CHANNEL;
             channelJoinedExpanded = MessagesController.getInstance(currentAccount).getMainSettings().getBoolean("c" + getDialogId() + "_rec", true);

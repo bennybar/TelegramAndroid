@@ -18908,7 +18908,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             }
 
             int boosts = currentMessageObject.messageOwner.from_boosts_applied;
-            if (boosts > 0) {
+            if (boosts > 0 && !org.telegram.ui.MyChatTweaks.hideBoost()) {
                 if (adminString == null) {
                     adminString = new SpannableStringBuilder();
                 }

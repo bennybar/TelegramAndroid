@@ -132,6 +132,15 @@ public class MySettings {
     private static final int ID_TICKS_UNDER_TIME = 216;
     private static final int ID_BADGE_BORDER = 217;
     private static final int ID_HIDE_GIFT = 218;
+    private static final int ID_CLUTTER_BASE = 230; // 230..235, one per MyChatTweaks.CLUTTER_KEYS
+    private static final String[][] CLUTTER_ROWS = {
+        {"Star reactions", "The ⭐ paid reaction in reaction bars and under posts."},
+        {"Boost prompts", "\"Boost\" in chat menus and boost counts next to group members' names."},
+        {"Similar channels", "The recommendations strip after joining a channel."},
+        {"Emoji statuses", "Animated emoji and Premium stars next to names. Verified checks stay."},
+        {"Suggest post button", "\"Suggest a post\" in channel bars and direct messages."},
+        {"Bot app buttons", "Mini-app \"Open\" buttons in bot chats, the chat list and search. Bot commands stay."},
+    };
 
     public static void filterItems(ArrayList<UItem> items) {
         addOwnItems(items);
@@ -197,6 +206,12 @@ public class MySettings {
         items.add(next++, UItem.asHeader("Inside chats"));
         items.add(next++, UItem.asButtonCheck(ID_DOUBLE_TAP_REPLY, "Double-tap to reply", "Double-tap a message to reply to it, instead of sending a reaction.")
             .setChecked(MyChatTweaks.doubleTapReply()).setMultiline(true));
+        items.add(next++, UItem.asShadow(null));
+        items.add(next++, UItem.asHeader("Hide clutter"));
+        for (int i = 0; i < CLUTTER_ROWS.length; i++) {
+            items.add(next++, UItem.asButtonCheck(ID_CLUTTER_BASE + i, CLUTTER_ROWS[i][0], CLUTTER_ROWS[i][1])
+                .setChecked(MyChatTweaks.isOn(MyChatTweaks.CLUTTER_KEYS[i])).setMultiline(true));
+        }
         items.add(next++, UItem.asButtonCheck(ID_HIDE_GIFT, "Hide gift button", "No gift button in any chat, including channels and groups.")
             .setChecked(MyChatTweaks.hideGiftButton()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_PREFER_RTL, "Prefer right-to-left", "Messages with any Hebrew in them read right-to-left, even when they start with an English word, number, link or emoji. Also while typing.")
@@ -225,6 +240,12 @@ public class MySettings {
             MyRtl.toggleMirrorList();
             refresh.run();
             BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply.").show();
+            return true;
+        }
+        if (item.id >= ID_CLUTTER_BASE && item.id < ID_CLUTTER_BASE + CLUTTER_ROWS.length) {
+            MyChatTweaks.toggle(MyChatTweaks.CLUTTER_KEYS[item.id - ID_CLUTTER_BASE]);
+            refresh.run();
+            BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply everywhere.").show();
             return true;
         }
         if (item.id == ID_HIDE_GIFT) {

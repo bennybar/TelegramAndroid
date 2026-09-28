@@ -19,6 +19,28 @@ public class MyChatTweaks {
         MessagesController.getGlobalMainSettings().edit().putBoolean("doubleTapReply", !doubleTapReply()).apply();
     }
 
+    // "Hide clutter" toggles, each checked at one hook in Telegram's code.
+    public static final String[] CLUTTER_KEYS = {"hidePaidReactions", "hideBoost", "hideSimilarChannels", "hideEmojiStatus", "hideSuggestButton", "hideBotAppButton"};
+
+    private static boolean pref(String key) {
+        return MessagesController.getGlobalMainSettings().getBoolean(key, false);
+    }
+
+    public static void toggle(String key) {
+        MessagesController.getGlobalMainSettings().edit().putBoolean(key, !pref(key)).apply();
+    }
+
+    public static boolean isOn(String key) {
+        return pref(key);
+    }
+
+    public static boolean hidePaidReactions() { return pref("hidePaidReactions"); }
+    public static boolean hideBoost() { return pref("hideBoost"); }
+    public static boolean hideSimilarChannels() { return pref("hideSimilarChannels"); }
+    public static boolean hideEmojiStatus() { return pref("hideEmojiStatus"); }
+    public static boolean hideSuggestButton() { return pref("hideSuggestButton"); }
+    public static boolean hideBotAppButton() { return pref("hideBotAppButton"); }
+
     public static boolean hideGiftButton() {
         return MessagesController.getGlobalMainSettings().getBoolean("hideGiftButton", false);
     }

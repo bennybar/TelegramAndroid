@@ -1138,7 +1138,7 @@ public class ReactionsContainerLayout extends FrameLayout implements Notificatio
             fillRecentReactionsList(visibleReactions);
         } else if (hitLimit) {
             allReactionsAvailable = false;
-            if (reactionsChat != null && reactionsChat.paid_reactions_available) {
+            if (reactionsChat != null && reactionsChat.paid_reactions_available && !org.telegram.ui.MyChatTweaks.hidePaidReactions()) {
                 hasStar = true;
                 visibleReactions.add(ReactionsLayoutInBubble.VisibleReaction.asStar());
             }
@@ -1146,7 +1146,7 @@ public class ReactionsContainerLayout extends FrameLayout implements Notificatio
                 visibleReactions.add(ReactionsLayoutInBubble.VisibleReaction.fromTL(result.reaction));
             }
         } else if (reactionsChat != null) {
-            if (reactionsChat != null && reactionsChat.paid_reactions_available) {
+            if (reactionsChat != null && reactionsChat.paid_reactions_available && !org.telegram.ui.MyChatTweaks.hidePaidReactions()) {
                 hasStar = true;
                 visibleReactions.add(ReactionsLayoutInBubble.VisibleReaction.asStar());
             }
