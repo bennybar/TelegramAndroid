@@ -136,6 +136,7 @@ public class MySettings {
     private static final int ID_READ_LABEL = 220;
     private static final int ID_TYPING_BUBBLE = 221;
     private static final int ID_CENTERED_HEADER = 222;
+    private static final int ID_BUBBLE_BLUE = 223;
     private static final int ID_CLUTTER_BASE = 230; // 230..235, one per MyChatTweaks.CLUTTER_KEYS
     private static final String[][] CLUTTER_ROWS = {
         {"Star reactions", "The ⭐ paid reaction in reaction bars and under posts."},
@@ -169,7 +170,9 @@ public class MySettings {
         items.add(0, UItem.asHeader("Look"));
         items.add(1, UItem.asButtonCheck(ID_BUBBLE_ICON, "Messages-style icon", "A green speech-bubble app icon on your home screen.")
             .setChecked(MyIcons.bubbleEnabled()).setMultiline(true));
-        int next = 2; // after the "Look" header and the icon row
+        items.add(2, UItem.asButtonCheck(ID_BUBBLE_BLUE, "Telegram blue", "Use Telegram blue instead of green for the Messages-style icon.")
+            .setChecked(MyIcons.blue()).setMultiline(true));
+        int next = 3; // after the "Look" header and the two icon rows
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             items.add(next++, UItem.asButtonCheck(ID_DEVICE_FONT, "Use device font", "Bold text (names, titles) uses your phone's font instead of Telegram's Roboto.")
                 .setChecked(SharedConfig.useSystemBoldFont).setMultiline(true));
@@ -280,6 +283,11 @@ public class MySettings {
             MyChatExtras.toggle(item.id == ID_READ_LABEL ? "readLabel" : item.id == ID_TYPING_BUBBLE ? "typingBubble" : "centeredHeader");
             refresh.run();
             BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Applies to chats opened from now on.").show();
+            return true;
+        }
+        if (item.id == ID_BUBBLE_BLUE) {
+            MyIcons.setBlue(!MyIcons.blue());
+            refresh.run();
             return true;
         }
         if (item.id == ID_BUBBLE_ICON) {

@@ -41,6 +41,19 @@
                 <category android:name="android.intent.category.MULTIWINDOW_LAUNCHER" />
             </intent-filter>
         </activity-alias>
+        <activity-alias
+            android:name="org.telegram.messenger.MyBubbleBlueIcon"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/my_bubble_blue_launcher"
+            android:roundIcon="@mipmap/my_bubble_blue_launcher_round"
+            android:targetActivity="org.telegram.ui.LaunchActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.MULTIWINDOW_LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
         <!-- Morning digest (org.telegram.ui.MyDigest) -->
         <receiver android:name="org.telegram.ui.MyDigest$AlarmReceiver" android:exported="false" />
         <service
