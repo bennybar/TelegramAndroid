@@ -5846,6 +5846,9 @@ public class ChatActivity extends BaseFragment implements
                     drawChatBackgroundElements(canvas);
                     super.dispatchDraw(canvas);
                     drawChatForegroundElements(canvas);
+                    if (chatMode == 0) {
+                        MyChatExtras.drawBottomExtras(ChatActivity.this, this, canvas, messages);
+                    }
                 }
                 canvas.restore();
             }
@@ -12495,6 +12498,7 @@ public class ChatActivity extends BaseFragment implements
             paddingBottom = AndroidUtilities.navigationBarHeight;
         } else {
             paddingBottom = blurredViewBottomOffset + dp(9 + 7)
+                + MyChatExtras.extraBottomPadding(this)
                 + inputIslandHeightCurrent
                 + getTopicTabsSideSize(TopicsTabsView.Position.BOTTOM)
                 + windowInsetsStateHolder.getAnimatedMaxBottomInset();
@@ -22731,6 +22735,10 @@ public class ChatActivity extends BaseFragment implements
             }
             if ((updateMask & MessagesController.UPDATE_MASK_USER_PRINT) != 0) {
                 updateSubtitle = true;
+                if (chatMode == 0 && !ChatObject.isChannelAndNotMegaGroup(currentChat)) {
+                    MyChatExtras.updateTyping(this, getMessagesController().getPrintingString(dialog_id, getThreadId(), false) != null);
+                    checkUi_chatListViewPaddings();
+                }
             }
             if ((updateMask & MessagesController.UPDATE_MASK_CHAT) != 0 && currentChat != null) {
                 boolean fwdBefore = isPeerNoForwards();
