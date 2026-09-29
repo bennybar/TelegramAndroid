@@ -815,6 +815,22 @@ public class ChatAvatarContainer extends FrameLayout implements FactorAnimator.T
         if (subtitleTextLargerCopyView != null) {
             subtitleTextLargerCopyView.layout(l, subtitleTop, l + subtitleTextLargerCopyView.getMeasuredWidth(), subtitleTop + subtitleTextLargerCopyView.getTextHeight());
         }
+        if (org.telegram.ui.MyChatExtras.centeredHeader()) {
+            // Center the photo + name/status group in the header (long names that already fill it stay put).
+            int textWidth = titleTextView.getTextWidth() + titleTextView.getSideDrawablesSize();
+            if (subtitleTextView != null && subtitleTextView.getVisibility() != GONE) {
+                textWidth = Math.max(textWidth, subtitleTextView.getTextWidth());
+            } else if (animatedSubtitleTextView != null && animatedSubtitleTextView.getVisibility() != GONE) {
+                textWidth = Math.max(textWidth, (int) animatedSubtitleTextView.getDrawable().getCurrentWidth());
+            }
+            int groupWidth = (l - leftPadding) + textWidth;
+            int shift = (getMeasuredWidth() - groupWidth) / 2 - leftPadding;
+            if (shift > 0) {
+                for (int i = 0; i < getChildCount(); i++) {
+                    getChildAt(i).offsetLeftAndRight(shift);
+                }
+            }
+        }
     }
 
     public void setLeftPadding(int value) {
