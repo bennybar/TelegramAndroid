@@ -137,6 +137,7 @@ public class MySettings {
     private static final int ID_TYPING_BUBBLE = 221;
     private static final int ID_CENTERED_HEADER = 222;
     private static final int ID_BUBBLE_BLUE = 223;
+    private static final int ID_PINNED_HEADER = 224;
     private static final int ID_CLUTTER_BASE = 230; // 230..235, one per MyChatTweaks.CLUTTER_KEYS
     private static final String[][] CLUTTER_ROWS = {
         {"Star reactions", "The ⭐ paid reaction in reaction bars and under posts."},
@@ -225,6 +226,8 @@ public class MySettings {
             .setChecked(MyChatTweaks.hideGiftButton()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_CENTERED_HEADER, "Centered chat header", "The photo and name sit in the middle of the chat's top bar, like iMessage.")
             .setChecked(MyChatExtras.centeredHeader()).setMultiline(true));
+        items.add(next++, UItem.asButtonCheck(ID_PINNED_HEADER, "Pinned message in header", "Hide the pinned-message bar; a pin icon in the top bar (in place of the call icon) jumps to it.")
+            .setChecked(MyChatExtras.pinnedInHeader()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_TYPING_BUBBLE, "Typing bubble", "An animated ••• bubble at the bottom of the chat while the other side types.")
             .setChecked(MyChatExtras.typingBubble()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_READ_LABEL, "\"Read\" under your last message", "Sending… / Delivered / Read below your newest message, like iMessage.")
@@ -279,8 +282,8 @@ public class MySettings {
             BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply everywhere.").show();
             return true;
         }
-        if (item.id == ID_READ_LABEL || item.id == ID_TYPING_BUBBLE || item.id == ID_CENTERED_HEADER) {
-            MyChatExtras.toggle(item.id == ID_READ_LABEL ? "readLabel" : item.id == ID_TYPING_BUBBLE ? "typingBubble" : "centeredHeader");
+        if (item.id == ID_READ_LABEL || item.id == ID_TYPING_BUBBLE || item.id == ID_CENTERED_HEADER || item.id == ID_PINNED_HEADER) {
+            MyChatExtras.toggle(item.id == ID_READ_LABEL ? "readLabel" : item.id == ID_TYPING_BUBBLE ? "typingBubble" : item.id == ID_CENTERED_HEADER ? "centeredHeader" : "pinnedInHeader");
             refresh.run();
             BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Applies to chats opened from now on.").show();
             return true;
