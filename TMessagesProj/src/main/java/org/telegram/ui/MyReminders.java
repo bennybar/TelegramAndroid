@@ -164,7 +164,7 @@ public class MyReminders {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         String text = reminder.optString("text");
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.notification)
+            .setSmallIcon(MyIcons.notificationIcon())
             .setContentTitle("Reminder · " + reminder.optString("title"))
             .setContentText(TextUtils.isEmpty(text) ? "Tap to open the message" : text)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(text))

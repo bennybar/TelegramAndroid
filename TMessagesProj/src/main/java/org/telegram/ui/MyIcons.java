@@ -51,6 +51,11 @@ public class MyIcons {
         }
     }
 
+    // Notification small icon: a bubble to match the Messages-style launcher icon, else Tegram's own.
+    public static int notificationIcon() {
+        return bubbleEnabled() ? org.telegram.messenger.R.drawable.my_notification_bubble : org.telegram.messenger.R.drawable.notification;
+    }
+
     // LauncherIconController.setIcon hook: picking one of Telegram's icons turns the bubble icons off.
     public static void disableBubble() {
         Context context = ApplicationLoader.applicationContext;

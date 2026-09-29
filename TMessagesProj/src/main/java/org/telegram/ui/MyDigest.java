@@ -169,7 +169,7 @@ public class MyDigest {
         String firstLine = text.contains("\n") ? text.substring(text.indexOf('\n') + 1).split("\n")[0] : text;
         Intent open = new Intent(context, LaunchActivity.class).setAction(ACTION_OPEN).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.notification)
+            .setSmallIcon(MyIcons.notificationIcon())
             .setContentTitle(title)
             .setContentText(firstLine)
             .setStyle(new NotificationCompat.BigTextStyle().bigText(text))
