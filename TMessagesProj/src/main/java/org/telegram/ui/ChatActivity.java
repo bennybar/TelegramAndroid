@@ -1836,6 +1836,8 @@ public class ChatActivity extends BaseFragment implements
     private final static int bot_help = 30;
     private final static int bot_settings = 31;
     private final static int call = 32;
+    private final static int my_pin_header = 9401;
+    private ActionBarMenu.LazyItem myPinHeaderItem;
     private final static int video_call = 33;
     private final static int hideTitle = 34;
     private final static int goToFirstMessage = 35;
@@ -4256,6 +4258,11 @@ public class ChatActivity extends BaseFragment implements
                     if (!getMessagesController().getTranslateController().toggleTranslatingDialog(getDialogId(), true)) {
                         updateTopPanel(true);
                     }
+                } else if (id == my_pin_header) {
+                    createPinnedMessageView();
+                    if (pinnedMessageView != null) {
+                        pinnedMessageView.callOnClick();
+                    }
                 } else if (id == call || id == video_call) {
                     if (currentUser != null && getParentActivity() != null) {
                         VoIPHelper.startCall(currentUser, id == video_call, userInfo != null && userInfo.video_calls_available, getParentActivity(), getMessagesController().getUserFull(currentUser.id), getAccountInstance());
@@ -4584,18 +4591,20 @@ public class ChatActivity extends BaseFragment implements
                 userFull = getMessagesController().getUserFull(currentUser.id);
                 if (userFull != null && userFull.phone_calls_available) {
                     showAudioCallAsIcon = !inPreviewMode;
-                    audioCallIconItem.setVisibility(View.VISIBLE);
+                    audioCallIconItem.setVisibility(MyChatExtras.callVisibility(this, View.VISIBLE));
                 } else {
                     showAudioCallAsIcon = false;
-                    audioCallIconItem.setVisibility(View.GONE);
+                    audioCallIconItem.setVisibility(MyChatExtras.callVisibility(this, View.GONE));
                 }
             }
+            myPinHeaderItem = menu.lazilyAddItem(my_pin_header, R.drawable.msg_pin, themeDelegate);
+            myPinHeaderItem.setContentDescription(LocaleController.getString(R.string.PinnedMessage));
         }
         /*
         Choreographer60FpsContent.getInstance().addFrameCallback(justForTest = () -> {
             if (audioCallIconItem != null) {
                 showAudioCallAsIcon = !showAudioCallAsIcon;
-                audioCallIconItem.setVisibility(!showAudioCallAsIcon ? View.GONE : View.VISIBLE);
+                audioCallIconItem.setVisibility(MyChatExtras.callVisibility(this, !showAudioCallAsIcon ? View.GONE : View.VISIBLE));
             }
         }, 1);
         */
@@ -19137,7 +19146,7 @@ public class ChatActivity extends BaseFragment implements
                     }
                 }
                 if (!actionBar.isSearchFieldVisible() && audioCallIconItem != null) {
-                    audioCallIconItem.setVisibility((showAudioCallAsIcon && !showSearchAsIcon) ? View.VISIBLE : View.GONE);
+                    audioCallIconItem.setVisibility(MyChatExtras.callVisibility(ChatActivity.this, (showAudioCallAsIcon && !showSearchAsIcon) ? View.VISIBLE : View.GONE));
                 }
                 if (headerItem != null) {
                     TLRPC.UserFull userInfo = getCurrentUserInfo();
@@ -24885,7 +24894,7 @@ public class ChatActivity extends BaseFragment implements
                                     item.setAlpha(0f);
                                     item.animate().alpha(1f).setDuration(160).setInterpolator(CubicBezierInterpolator.EASE_IN).setStartDelay(50).start();
                                 }
-                                audioCallIconItem.setVisibility(View.VISIBLE);
+                                audioCallIconItem.setVisibility(MyChatExtras.callVisibility(this, View.VISIBLE));
                             }
                         } else {
                             headerItem.showSubItem(call, true);
@@ -24899,7 +24908,7 @@ public class ChatActivity extends BaseFragment implements
                         headerItem.hideSubItem(call);
                         headerItem.hideSubItem(video_call);
                         if (audioCallIconItem != null) {
-                            audioCallIconItem.setVisibility(View.GONE);
+                            audioCallIconItem.setVisibility(MyChatExtras.callVisibility(this, View.GONE));
                         }
                     }
                 }
@@ -29311,7 +29320,9 @@ public class ChatActivity extends BaseFragment implements
         String callLink = callLink(pinnedMessageObject);
         pinnedMessageButtonShown = botButton != null || !TextUtils.isEmpty(callLink);
         SharedPreferences preferences = MessagesController.getNotificationsSettings(currentAccount);
-        if ((threadMessageObject == null || isTopic) && (chatInfo == null && userInfo == null || pinned_msg_id == 0 || !pinnedMessageIds.isEmpty() && pinnedMessageIds.get(0) == preferences.getInt("pin_" + dialog_id, 0)) || isReport() || actionBar != null && (actionBar.isActionModeShowed() || actionBar.isSearchFieldVisible())) {
+        boolean myHideBar = (threadMessageObject == null || isTopic) && (chatInfo == null && userInfo == null || pinned_msg_id == 0 || !pinnedMessageIds.isEmpty() && pinnedMessageIds.get(0) == preferences.getInt("pin_" + dialog_id, 0)) || isReport() || actionBar != null && (actionBar.isActionModeShowed() || actionBar.isSearchFieldVisible());
+        MyChatExtras.setPinInHeader(this, myPinHeaderItem, audioCallIconItem, !myHideBar && !(isThreadChat() && !isTopic));
+        if (myHideBar || MyChatExtras.isPinInHeader(this)) {
             changed = hidePinnedMessageView(animated);
         } else {
             if (pinnedMessageView == null) {
@@ -30633,10 +30644,10 @@ public class ChatActivity extends BaseFragment implements
             TLRPC.UserFull userFull = getMessagesController().getUserFull(currentUser.id);
             if (userFull != null && userFull.phone_calls_available) {
                 showAudioCallAsIcon = !inPreviewMode;
-                audioCallIconItem.setVisibility(View.VISIBLE);
+                audioCallIconItem.setVisibility(MyChatExtras.callVisibility(this, View.VISIBLE));
             } else {
                 showAudioCallAsIcon = false;
-                audioCallIconItem.setVisibility(View.GONE);
+                audioCallIconItem.setVisibility(MyChatExtras.callVisibility(this, View.GONE));
             }
         }
         if (avatarContainer != null) {
@@ -36089,7 +36100,7 @@ public class ChatActivity extends BaseFragment implements
                 searchIconItem.setVisibility(View.GONE);
             }
             if (audioCallIconItem != null && showAudioCallAsIcon) {
-                audioCallIconItem.setVisibility(View.GONE);
+                audioCallIconItem.setVisibility(MyChatExtras.callVisibility(this, View.GONE));
             }
             if (topicCreateItem != null) {
                 topicCreateItem.setVisibility(View.GONE);
@@ -36159,7 +36170,7 @@ public class ChatActivity extends BaseFragment implements
                 searchIconItem.setVisibility(View.GONE);
             }
             if (audioCallIconItem != null && showAudioCallAsIcon) {
-                audioCallIconItem.setVisibility(View.GONE);
+                audioCallIconItem.setVisibility(MyChatExtras.callVisibility(this, View.GONE));
             }
             if (topicCreateItem != null) {
                 topicCreateItem.setVisibility(View.GONE);
@@ -36253,7 +36264,7 @@ public class ChatActivity extends BaseFragment implements
                 searchIconItem.setVisibility(View.GONE);
             }
             if (audioCallIconItem != null && showAudioCallAsIcon) {
-                audioCallIconItem.setVisibility(View.GONE);
+                audioCallIconItem.setVisibility(MyChatExtras.callVisibility(this, View.GONE));
             }
             if (topicCreateItem != null) {
                 topicCreateItem.setVisibility(View.GONE);
@@ -36312,7 +36323,7 @@ public class ChatActivity extends BaseFragment implements
                 searchIconItem.setVisibility(View.GONE);
             }
             if (audioCallIconItem != null && showAudioCallAsIcon) {
-                audioCallIconItem.setVisibility(View.GONE);
+                audioCallIconItem.setVisibility(MyChatExtras.callVisibility(this, View.GONE));
             }
             if (topicCreateItem != null) {
                 topicCreateItem.setVisibility(View.GONE);
@@ -39578,7 +39589,7 @@ public class ChatActivity extends BaseFragment implements
                     searchIconItem.setVisibility(View.GONE);
                 }
                 if (audioCallIconItem != null && showAudioCallAsIcon) {
-                    audioCallIconItem.setVisibility(View.GONE);
+                    audioCallIconItem.setVisibility(MyChatExtras.callVisibility(ChatActivity.this, View.GONE));
                 }
                 if (topicCreateItem != null) {
                     topicCreateItem.setVisibility(View.GONE);
@@ -39600,7 +39611,7 @@ public class ChatActivity extends BaseFragment implements
                     searchIconItem.setVisibility(View.GONE);
                 }
                 if (audioCallIconItem != null && showAudioCallAsIcon) {
-                    audioCallIconItem.setVisibility(View.GONE);
+                    audioCallIconItem.setVisibility(MyChatExtras.callVisibility(ChatActivity.this, View.GONE));
                 }
                 if (topicCreateItem != null) {
                     topicCreateItem.setVisibility(View.GONE);
@@ -39610,7 +39621,7 @@ public class ChatActivity extends BaseFragment implements
                     headerItem.setVisibility(View.VISIBLE);
                 }
                 if (audioCallIconItem != null && showAudioCallAsIcon) {
-                    audioCallIconItem.setVisibility(View.VISIBLE);
+                    audioCallIconItem.setVisibility(MyChatExtras.callVisibility(ChatActivity.this, View.VISIBLE));
                 }
                 if (topicCreateItem != null) {
                     topicCreateItem.setVisibility(View.VISIBLE);

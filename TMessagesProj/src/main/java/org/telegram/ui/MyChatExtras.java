@@ -10,6 +10,7 @@ import android.view.ViewGroup;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
+import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.ChatMessageCell;
 
@@ -25,6 +26,8 @@ public class MyChatExtras {
     private static final int TYPING_BAND_DP = 40;
 
     private static final WeakHashMap<ChatActivity, Boolean> typing = new WeakHashMap<>();
+    private static final WeakHashMap<ChatActivity, Boolean> pinInHeader = new WeakHashMap<>();
+    private static final WeakHashMap<ChatActivity, Integer> wantedCallVisibility = new WeakHashMap<>();
     private static final RectF rect = new RectF();
     private static Paint dotPaint;
     private static Paint bubblePaint;
@@ -39,6 +42,36 @@ public class MyChatExtras {
 
     public static boolean centeredHeader() {
         return MessagesController.getGlobalMainSettings().getBoolean("centeredHeader", false);
+    }
+
+    public static boolean pinnedInHeader() {
+        return MessagesController.getGlobalMainSettings().getBoolean("pinnedInHeader", false);
+    }
+
+    // "Pinned message in the header": instead of the pinned bar under the top bar, a pin icon takes the call
+    // icon's place; tapping it jumps to the pinned message (ChatActivity routes the tap to the hidden bar).
+    // updatePinnedMessageView hook; show = the pinned bar would be visible now.
+    public static void setPinInHeader(ChatActivity chat, ActionBarMenu.LazyItem pinItem, ActionBarMenu.LazyItem callItem, boolean show) {
+        show = show && pinItem != null && pinnedInHeader();
+        pinInHeader.put(chat, show);
+        if (pinItem != null) {
+            pinItem.setVisibility(show ? View.VISIBLE : View.GONE);
+        }
+        Integer wanted = wantedCallVisibility.get(chat);
+        if (callItem != null && wanted != null) {
+            callItem.setVisibility(show ? View.GONE : wanted);
+        }
+    }
+
+    public static boolean isPinInHeader(ChatActivity chat) {
+        Boolean value = pinInHeader.get(chat);
+        return value != null && value;
+    }
+
+    // Hook on every call-icon visibility change: remember what Telegram wants, keep it hidden while the pin shows.
+    public static int callVisibility(ChatActivity chat, int visibility) {
+        wantedCallVisibility.put(chat, visibility);
+        return isPinInHeader(chat) ? View.GONE : visibility;
     }
 
     public static void toggle(String key) {
