@@ -9,6 +9,9 @@ import org.telegram.messenger.R;
 
 public class LauncherIconController {
     public static void tryFixLauncherIconIfNeeded() {
+        if (MyIcons.bubbleEnabled()) {
+            return; // the Messages-style icon counts as a valid launcher icon
+        }
         for (LauncherIcon icon : LauncherIcon.values()) {
             if (isEnabled(icon)) {
                 return;
@@ -31,6 +34,7 @@ public class LauncherIconController {
             pm.setComponentEnabledSetting(i.getComponentName(ctx), i == icon ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED :
                     PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP);
         }
+        MyIcons.disableBubble();
     }
 
     public enum LauncherIcon {

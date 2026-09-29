@@ -132,6 +132,7 @@ public class MySettings {
     private static final int ID_TICKS_UNDER_TIME = 216;
     private static final int ID_BADGE_BORDER = 217;
     private static final int ID_HIDE_GIFT = 218;
+    private static final int ID_BUBBLE_ICON = 219;
     private static final int ID_CLUTTER_BASE = 230; // 230..235, one per MyChatTweaks.CLUTTER_KEYS
     private static final String[][] CLUTTER_ROWS = {
         {"Star reactions", "The ⭐ paid reaction in reaction bars and under posts."},
@@ -163,7 +164,9 @@ public class MySettings {
 
     private static void addOwnItems(ArrayList<UItem> items) {
         items.add(0, UItem.asHeader("Look"));
-        int next = 1;
+        items.add(1, UItem.asButtonCheck(ID_BUBBLE_ICON, "Messages-style icon", "A green speech-bubble app icon on your home screen.")
+            .setChecked(MyIcons.bubbleEnabled()).setMultiline(true));
+        int next = 2; // after the "Look" header and the icon row
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             items.add(next++, UItem.asButtonCheck(ID_DEVICE_FONT, "Use device font", "Bold text (names, titles) uses your phone's font instead of Telegram's Roboto.")
                 .setChecked(SharedConfig.useSystemBoldFont).setMultiline(true));
@@ -262,6 +265,12 @@ public class MySettings {
             MyChatTweaks.toggle(MyChatTweaks.CLUTTER_KEYS[item.id - ID_CLUTTER_BASE]);
             refresh.run();
             BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply everywhere.").show();
+            return true;
+        }
+        if (item.id == ID_BUBBLE_ICON) {
+            MyIcons.setBubbleEnabled(!MyIcons.bubbleEnabled());
+            refresh.run();
+            BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Icon changed. Your launcher may take a moment to update it.").show();
             return true;
         }
         if (item.id == ID_HIDE_GIFT) {
