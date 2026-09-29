@@ -133,6 +133,8 @@ public class MySettings {
     private static final int ID_BADGE_BORDER = 217;
     private static final int ID_HIDE_GIFT = 218;
     private static final int ID_BUBBLE_ICON = 219;
+    private static final int ID_READ_LABEL = 220;
+    private static final int ID_TYPING_BUBBLE = 221;
     private static final int ID_CLUTTER_BASE = 230; // 230..235, one per MyChatTweaks.CLUTTER_KEYS
     private static final String[][] CLUTTER_ROWS = {
         {"Star reactions", "The ⭐ paid reaction in reaction bars and under posts."},
@@ -217,6 +219,10 @@ public class MySettings {
         }
         items.add(next++, UItem.asButtonCheck(ID_HIDE_GIFT, "Hide gift button", "No gift button in any chat, including channels and groups.")
             .setChecked(MyChatTweaks.hideGiftButton()).setMultiline(true));
+        items.add(next++, UItem.asButtonCheck(ID_TYPING_BUBBLE, "Typing bubble", "An animated ••• bubble at the bottom of the chat while the other side types.")
+            .setChecked(MyChatExtras.typingBubble()).setMultiline(true));
+        items.add(next++, UItem.asButtonCheck(ID_READ_LABEL, "\"Read\" under your last message", "Sending… / Delivered / Read below your newest message, like iMessage.")
+            .setChecked(MyChatExtras.readLabel()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_PREFER_RTL, "Prefer right-to-left", "Messages with any Hebrew in them read right-to-left, even when they start with an English word, number, link or emoji. Also while typing.")
             .setChecked(MyRtl.preferRtl()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_MIRROR_LIST, "Mirror chat list", "Right-to-left chat rows, like Telegram in Hebrew: photo on the right, time on the left. Menus stay in English.")
@@ -265,6 +271,12 @@ public class MySettings {
             MyChatTweaks.toggle(MyChatTweaks.CLUTTER_KEYS[item.id - ID_CLUTTER_BASE]);
             refresh.run();
             BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply everywhere.").show();
+            return true;
+        }
+        if (item.id == ID_READ_LABEL || item.id == ID_TYPING_BUBBLE) {
+            MyChatExtras.toggle(item.id == ID_READ_LABEL ? "readLabel" : "typingBubble");
+            refresh.run();
+            BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Applies to chats opened from now on.").show();
             return true;
         }
         if (item.id == ID_BUBBLE_ICON) {
