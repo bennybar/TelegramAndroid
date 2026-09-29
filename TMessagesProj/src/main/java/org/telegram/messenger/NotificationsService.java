@@ -106,7 +106,7 @@ public class NotificationsService extends Service {
             NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
                     .setShowWhen(false)
                     .setOngoing(true)
-                    .setSmallIcon(R.drawable.notification)
+                    .setSmallIcon(org.telegram.ui.MyIcons.notificationIcon())
                     .setContentText("Push service: tap to learn more");
             try {
                 Intent explainIntent = new Intent("android.intent.action.VIEW");
