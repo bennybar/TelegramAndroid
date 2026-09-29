@@ -37,6 +37,10 @@ public class MyChatExtras {
         return MessagesController.getGlobalMainSettings().getBoolean("typingBubble", false);
     }
 
+    public static boolean centeredHeader() {
+        return MessagesController.getGlobalMainSettings().getBoolean("centeredHeader", false);
+    }
+
     public static void toggle(String key) {
         MessagesController.getGlobalMainSettings().edit().putBoolean(key, !MessagesController.getGlobalMainSettings().getBoolean(key, false)).apply();
     }

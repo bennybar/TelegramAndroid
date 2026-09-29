@@ -135,6 +135,7 @@ public class MySettings {
     private static final int ID_BUBBLE_ICON = 219;
     private static final int ID_READ_LABEL = 220;
     private static final int ID_TYPING_BUBBLE = 221;
+    private static final int ID_CENTERED_HEADER = 222;
     private static final int ID_CLUTTER_BASE = 230; // 230..235, one per MyChatTweaks.CLUTTER_KEYS
     private static final String[][] CLUTTER_ROWS = {
         {"Star reactions", "The ⭐ paid reaction in reaction bars and under posts."},
@@ -219,6 +220,8 @@ public class MySettings {
         }
         items.add(next++, UItem.asButtonCheck(ID_HIDE_GIFT, "Hide gift button", "No gift button in any chat, including channels and groups.")
             .setChecked(MyChatTweaks.hideGiftButton()).setMultiline(true));
+        items.add(next++, UItem.asButtonCheck(ID_CENTERED_HEADER, "Centered chat header", "The photo and name sit in the middle of the chat's top bar, like iMessage.")
+            .setChecked(MyChatExtras.centeredHeader()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_TYPING_BUBBLE, "Typing bubble", "An animated ••• bubble at the bottom of the chat while the other side types.")
             .setChecked(MyChatExtras.typingBubble()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_READ_LABEL, "\"Read\" under your last message", "Sending… / Delivered / Read below your newest message, like iMessage.")
@@ -273,8 +276,8 @@ public class MySettings {
             BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply everywhere.").show();
             return true;
         }
-        if (item.id == ID_READ_LABEL || item.id == ID_TYPING_BUBBLE) {
-            MyChatExtras.toggle(item.id == ID_READ_LABEL ? "readLabel" : "typingBubble");
+        if (item.id == ID_READ_LABEL || item.id == ID_TYPING_BUBBLE || item.id == ID_CENTERED_HEADER) {
+            MyChatExtras.toggle(item.id == ID_READ_LABEL ? "readLabel" : item.id == ID_TYPING_BUBBLE ? "typingBubble" : "centeredHeader");
             refresh.run();
             BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Applies to chats opened from now on.").show();
             return true;
