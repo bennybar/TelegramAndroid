@@ -10,6 +10,7 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
@@ -32,7 +33,7 @@ public class MyShare {
         NotificationCenter center = NotificationCenter.getInstance(account);
 
         AlertDialog progress = new AlertDialog(activity, AlertDialog.ALERT_TYPE_LOADING);
-        progress.setMessage(activity.getString(R.string.Loading));
+        progress.setMessage(LocaleController.getString(R.string.Loading));
         progress.setCanCancel(true);
         progress.setCanceledOnTouchOutside(false);
 
@@ -83,7 +84,7 @@ public class MyShare {
             Uri uri = FileProvider.getUriForFile(activity, ApplicationLoader.getApplicationId() + ".provider", file);
             intent.putExtra(Intent.EXTRA_STREAM, uri);
             intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            activity.startActivityForResult(Intent.createChooser(intent, activity.getString(R.string.ShareFile)), 500);
+            activity.startActivityForResult(Intent.createChooser(intent, LocaleController.getString(R.string.ShareFile)), 500);
         } catch (Exception e) {
             FileLog.e(e);
         }
