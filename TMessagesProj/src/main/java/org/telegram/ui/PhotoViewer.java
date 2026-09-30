@@ -4668,7 +4668,7 @@ public class PhotoViewer implements NotificationCenter.NotificationCenterDelegat
                 }
 
                 parentActivity.startActivityForResult(Intent.createChooser(intent, getString("ShareFile", R.string.ShareFile)), 500);
-            } else {
+            } else if (!MyShare.downloadThenShare(parentActivity, currentMessageObject)) {
                 showDownloadAlert();
             }
         } catch (Exception e) {
