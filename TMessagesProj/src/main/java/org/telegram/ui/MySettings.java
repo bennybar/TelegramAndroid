@@ -139,6 +139,8 @@ public class MySettings {
     private static final int ID_BUBBLE_BLUE = 223;
     private static final int ID_PINNED_HEADER = 224;
     private static final int ID_INPUT_SIZE = 225;
+    private static final int ID_PIN_EMOJI_SEARCH = 226;
+    private static final int ID_HIDE_EMOJI_TITLES = 227;
     private static final int ID_CLUTTER_BASE = 230; // 230..235, one per MyChatTweaks.CLUTTER_KEYS
     private static final String[][] CLUTTER_ROWS = {
         {"Star reactions", "The ⭐ paid reaction in reaction bars and under posts."},
@@ -242,6 +244,13 @@ public class MySettings {
         items.add(next++, UItem.asShadow(null));
         items.add(next++, UItem.asHeader("Message bubble width"));
         items.add(next++, UItem.asSlideView(MyChatTweaks.BUBBLE_LABELS, MyChatTweaks.bubbleIndex(), MyChatTweaks::setBubbleIndex));
+        items.add(next++, UItem.asShadow(null));
+        items.add(next++, UItem.asHeader("Emoji panel height"));
+        items.add(next++, UItem.asSlideView(MyUiTweaks.EMOJI_HEIGHT_LABELS, MyUiTweaks.emojiHeightIndex(), MyUiTweaks::setEmojiHeightIndex));
+        items.add(next++, UItem.asButtonCheck(ID_PIN_EMOJI_SEARCH, "Keep emoji search on top", "The emoji search bar stays put instead of scrolling away.")
+            .setChecked(MyUiTweaks.pinEmojiSearch()).setMultiline(true));
+        items.add(next++, UItem.asButtonCheck(ID_HIDE_EMOJI_TITLES, "Hide emoji section titles", "No \"Emoji & People\", \"Recently used\" and similar titles between emoji.")
+            .setChecked(MyUiTweaks.hideEmojiTitles()).setMultiline(true));
         items.add(next, UItem.asShadow("Reopen Tegram after changing any of these."));
         items.add(UItem.asHeader("Google push"));
         String relay = MyFcmDistributor.relayUrl();
@@ -283,6 +292,12 @@ public class MySettings {
             MyChatTweaks.toggle(MyChatTweaks.CLUTTER_KEYS[item.id - ID_CLUTTER_BASE]);
             refresh.run();
             BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply everywhere.").show();
+            return true;
+        }
+        if (item.id == ID_PIN_EMOJI_SEARCH || item.id == ID_HIDE_EMOJI_TITLES) {
+            MyUiTweaks.toggle(item.id == ID_PIN_EMOJI_SEARCH ? "pinEmojiSearch" : "hideEmojiTitles");
+            refresh.run();
+            BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Applies to chats opened from now on.").show();
             return true;
         }
         if (item.id == ID_INPUT_SIZE) {
