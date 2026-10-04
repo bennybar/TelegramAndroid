@@ -129,12 +129,6 @@ public class MyUiTweaks {
         editText.setTranslationY(AndroidUtilities.dp(4));
     }
 
-    // EmojiView hook: Telegram lifts the emoji/sticker/GIF search text by 2dp; measured on device it then sits
-    // ~3dp above the pill's center (and the search icon), so put it 1dp low instead.
-    public static float emojiSearchTextOffset() {
-        return AndroidUtilities.dp(1);
-    }
-
     public static boolean pinEmojiSearch() {
         return pref("pinEmojiSearch");
     }

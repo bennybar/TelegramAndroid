@@ -76,7 +76,7 @@ public class MyGiphyView extends FrameLayout {
     }
 
     private static class Gif {
-        String preview, send;
+        String preview, still, send;
         int width, height;
     }
 
@@ -92,7 +92,6 @@ public class MyGiphyView extends FrameLayout {
         super(context);
         this.delegate = delegate;
         int textColor = Theme.getColor(Theme.key_chat_emojiPanelIcon, resourcesProvider);
-
 
         listView = new RecyclerListView(context);
         GridLayoutManager layoutManager = new GridLayoutManager(context, 3);
@@ -130,7 +129,9 @@ public class MyGiphyView extends FrameLayout {
             public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
                 BackupImageView image = (BackupImageView) holder.itemView;
                 image.setAlpha(1f);
-                image.setImage(ImageLocation.getForPath(gifs.get(position).preview), "100_100", (android.graphics.drawable.Drawable) null, null);
+                // The still is shown until the mp4 plays (and stays while Telegram pauses animations).
+                Gif gif = gifs.get(position);
+                image.setImage(ImageLocation.getForPath(gif.preview), "100_100", gif.still != null ? ImageLocation.getForPath(gif.still) : null, "100_100", 0, null);
             }
         });
         listView.setOnItemClickListener((view, position) -> {
@@ -225,6 +226,8 @@ public class MyGiphyView extends FrameLayout {
                     }
                     Gif gif = new Gif();
                     gif.preview = stripQuery(preview.getString("mp4"));
+                    JSONObject still = images.optJSONObject("480w_still");
+                    gif.still = still != null && !TextUtils.isEmpty(still.optString("url")) ? stripQuery(still.getString("url")) : null;
                     gif.send = stripQuery(original.getString("mp4"));
                     gif.width = original.optInt("width");
                     gif.height = original.optInt("height");
