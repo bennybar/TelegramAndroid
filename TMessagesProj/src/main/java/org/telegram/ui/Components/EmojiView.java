@@ -897,7 +897,7 @@ public class EmojiView extends FrameLayout implements
             searchEditText.setCursorColor(getThemedColor(Theme.key_featuredStickers_addedIcon));
             searchEditText.setCursorSize(dp(20));
             searchEditText.setCursorWidth(1.5f);
-            searchEditText.setTranslationY(dp(-2));
+            searchEditText.setTranslationY(org.telegram.ui.MyUiTweaks.emojiSearchTextOffset());
             inputBox.addView(searchEditText, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 40, Gravity.LEFT | Gravity.TOP, 0, 0, 28, 0));
             searchEditText.addTextChangedListener(new TextWatcher() {
                 @Override
@@ -1743,7 +1743,7 @@ public class EmojiView extends FrameLayout implements
         });
         emojiGridView.setTopGlowOffset(AndroidUtilities.dp(38));
         emojiGridView.setBottomGlowOffset(AndroidUtilities.dp(36));
-        emojiGridView.setPadding(AndroidUtilities.dp(5), AndroidUtilities.dp(36), AndroidUtilities.dp(5), AndroidUtilities.dp(44));
+        emojiGridView.setPadding(AndroidUtilities.dp(5), AndroidUtilities.dp(36) + (needEmojiSearch && org.telegram.ui.MyUiTweaks.pinEmojiSearch() ? searchFieldHeight : 0), AndroidUtilities.dp(5), AndroidUtilities.dp(44));
         emojiGridView.setGlowColor(getThemedColor(Theme.key_chat_emojiPanelBackground));
         emojiGridView.setItemSelectorColorProvider(p -> 0);
         emojiGridView.setClipToPadding(false);
@@ -5267,6 +5267,9 @@ public class EmojiView extends FrameLayout implements
     }
 
     private void animateTabsY(@Type int type) {
+        if (type == Type.EMOJIS && org.telegram.ui.MyUiTweaks.pinEmojiSearch()) {
+            return;
+        }
         if ((delegate != null && delegate.isSearchOpened()) || type == Type.STICKERS) {
             return;
         }
@@ -5415,7 +5418,7 @@ public class EmojiView extends FrameLayout implements
         }
 
         final RecyclerView.ViewHolder holder = emojiGridView.findViewHolderForAdapterPosition(0);
-        final float translationY = (holder != null ? holder.itemView.getTop() : -searchFieldHeight)
+        final float translationY = (org.telegram.ui.MyUiTweaks.pinEmojiSearch() ? AndroidUtilities.dp(36) : holder != null ? holder.itemView.getTop() : -searchFieldHeight)
             + animatorSearchEmojiPackSelected.getFloatValue() * dp(SEARCH_SELECTED_PACK_HEADER_ANIMATION_SIZE);
 
         emojiSearchField.setTranslationY(translationY);
@@ -5433,7 +5436,7 @@ public class EmojiView extends FrameLayout implements
     }
 
     private void checkEmojiTabY(View list, int dy) {
-        if (list == null) {
+        if (list == null || org.telegram.ui.MyUiTweaks.pinEmojiSearch()) {
             emojiTabs.setTranslationY(tabsMinusDy[Type.EMOJIS] = 0);
             return;
         }
@@ -7447,7 +7450,7 @@ public class EmojiView extends FrameLayout implements
                 case VIEW_TYPE_SEARCH:
                 default:
                     view = new View(getContext());
-                    view.setLayoutParams(new RecyclerView.LayoutParams(LayoutHelper.MATCH_PARENT, searchFieldHeight));
+                    view.setLayoutParams(new RecyclerView.LayoutParams(LayoutHelper.MATCH_PARENT, org.telegram.ui.MyUiTweaks.pinEmojiSearch() ? 0 : searchFieldHeight));
                     break;
             }
             return new RecyclerListView.Holder(view);
@@ -7549,7 +7552,7 @@ public class EmojiView extends FrameLayout implements
                     if (position == trendingHeaderRow) {
                         cell.setText(getString(R.string.FeaturedEmojiPacks), R.drawable.msg_close, getString(R.string.AccDescrCloseTrendingEmoji));
                     } else if (position == recentlyUsedHeaderRow) {
-                        cell.setText(getString(R.string.RecentlyUsed), 0);
+                        cell.setText(org.telegram.ui.MyUiTweaks.emojiSectionTitle(getString(R.string.RecentlyUsed)), 0);
                     } else if (index >= emojiTitles.length) {
                         try {
                             cell.setText(emojipacksProcessed.get(index - emojiTitles.length).set.title, 0);
@@ -7557,7 +7560,7 @@ public class EmojiView extends FrameLayout implements
                             cell.setText("", 0);
                         }
                     } else {
-                        cell.setText(emojiTitles[index], 0);
+                        cell.setText(org.telegram.ui.MyUiTweaks.emojiSectionTitle(emojiTitles[index]), 0);
                     }
                     break;
                 }

@@ -12944,6 +12944,7 @@ public class ChatActivityEnterView extends FrameLayout implements
             if (parentFragment != null && parentFragment.getParentLayout() != null) {
                 currentHeight -= parentFragment.getParentLayout().getBottomTabsHeight(false);
             }
+            if (contentType == POPUP_CONTENT_EMOJI_KEYBOARD) currentHeight = org.telegram.ui.MyUiTweaks.emojiPanelHeight(currentHeight);
             /*if (!samePannelWasVisible && !anotherPanelWasVisible) {
                 currentHeight = 0;
             } else */
@@ -13431,6 +13432,7 @@ public class ChatActivityEnterView extends FrameLayout implements
             if (parentFragment != null && parentFragment.getParentLayout() != null) {
                 newHeight -= parentFragment.getParentLayout().getBottomTabsHeight(false);
             }
+            if (currentPopupContentType == POPUP_CONTENT_EMOJI_KEYBOARD) newHeight = org.telegram.ui.MyUiTweaks.emojiPanelHeight(newHeight);
             if (currentPopupContentType == POPUP_CONTENT_BOT_KEYBOARD && !botKeyboardView.isFullSize()) {
                 newHeight = Math.min(botKeyboardView.getKeyboardHeight(), newHeight);
             }

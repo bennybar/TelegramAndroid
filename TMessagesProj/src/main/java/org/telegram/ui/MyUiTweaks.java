@@ -22,7 +22,7 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.WeakHashMap;
 
-// Look toggles: Material 3 bottom bar, hidden Profile tab, compact search bar, tinted pinned chats.
+// Look toggles: Material 3 bottom bar, hidden Profile tab, compact search bar, tinted pinned chats, emoji panel.
 public class MyUiTweaks {
 
     private static boolean pref(String key) {
@@ -127,6 +127,43 @@ public class MyUiTweaks {
         // Measured on device: in the 40dp field the text sat ~4dp above the pill's visual center
         // (the glass pill is inset and shadowed unevenly), so move the text down by that much.
         editText.setTranslationY(AndroidUtilities.dp(4));
+    }
+
+    // EmojiView hook: Telegram lifts the emoji/sticker/GIF search text by 2dp; measured on device it then sits
+    // ~3dp above the pill's center (and the search icon), so put it 1dp low instead.
+    public static float emojiSearchTextOffset() {
+        return AndroidUtilities.dp(1);
+    }
+
+    public static boolean pinEmojiSearch() {
+        return pref("pinEmojiSearch");
+    }
+
+    public static boolean hideEmojiTitles() {
+        return pref("hideEmojiTitles");
+    }
+
+    // EmojiView hook: null collapses the "Emoji & People" / "Recently used" row to 1px. The rows stay, so the
+    // category tabs still jump to the right place.
+    public static String emojiSectionTitle(String title) {
+        return hideEmojiTitles() ? null : title;
+    }
+
+    public static final String[] EMOJI_HEIGHT_LABELS = {"100%", "90%", "80%", "70%", "60%"};
+    private static final float[] EMOJI_HEIGHTS = {1f, 0.9f, 0.8f, 0.7f, 0.6f};
+
+    public static int emojiHeightIndex() {
+        int index = ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Context.MODE_PRIVATE).getInt("emojiPanelHeight", 0);
+        return Math.max(0, Math.min(EMOJI_HEIGHTS.length - 1, index));
+    }
+
+    public static void setEmojiHeightIndex(int index) {
+        ApplicationLoader.applicationContext.getSharedPreferences("mainconfig", Context.MODE_PRIVATE).edit().putInt("emojiPanelHeight", index).apply();
+    }
+
+    // ChatActivityEnterView hook: the emoji/GIF/sticker panel as a share of the keyboard's height.
+    public static int emojiPanelHeight(int height) {
+        return (int) (height * EMOJI_HEIGHTS[emojiHeightIndex()]);
     }
 
     // ---- Tinted pinned chats ----
