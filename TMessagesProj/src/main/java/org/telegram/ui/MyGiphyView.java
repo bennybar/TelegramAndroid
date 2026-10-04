@@ -2,15 +2,12 @@ package org.telegram.ui;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
-import android.widget.HorizontalScrollView;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.recyclerview.widget.GridLayoutManager;
@@ -41,7 +38,8 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 
-// "GIPHY instead of Stickers": the emoji panel's third page shows GIPHY GIFs (trending, mood chips, search).
+// "GIPHY instead of Stickers": the emoji panel's third page shows GIPHY GIFs (trending, search). EmojiView moves its
+// page-2 search bar in here, so typing works like Telegram's own sticker search; its category icons search by emoji.
 // The picked GIF's mp4 is downloaded to Telegram's cache, then sent as a normal Telegram GIF through the old
 // web-search path (SearchImage type 1 -> SendMessagesHelper.prepareSendingMedia). The API key is a per-device
 // setting, never in the APK, and stays out of settings backups.
@@ -50,12 +48,6 @@ public class MyGiphyView extends FrameLayout {
     public interface Delegate {
         void onPick(View cell, MediaController.SearchImage gif, String query);
     }
-
-    private static final String[][] CHIPS = {
-        {"🔥 Trending", ""}, {"🔍", null}, {"😂", "lol"}, {"❤️", "love"}, {"👍", "thumbs up"}, {"🎉", "congrats"},
-        {"😮", "wow"}, {"😢", "sad"}, {"🙄", "eye roll"}, {"👋", "hi"}, {"😡", "angry"}, {"🤔", "thinking"},
-        {"😴", "sleepy"}, {"🙏", "thank you"},
-    };
 
     public static SharedPreferences prefs() {
         return ApplicationLoader.applicationContext.getSharedPreferences("mygiphy", Context.MODE_PRIVATE);
@@ -92,7 +84,6 @@ public class MyGiphyView extends FrameLayout {
     private final ArrayList<Gif> gifs = new ArrayList<>();
     private final RecyclerListView listView;
     private final TextView emptyView;
-    private final LinearLayout chips;
     private String query = "";
     private int requestId;
     private boolean loaded;
@@ -102,36 +93,6 @@ public class MyGiphyView extends FrameLayout {
         this.delegate = delegate;
         int textColor = Theme.getColor(Theme.key_chat_emojiPanelIcon, resourcesProvider);
 
-        HorizontalScrollView chipsScroll = new HorizontalScrollView(context);
-        chipsScroll.setHorizontalScrollBarEnabled(false);
-        chips = new LinearLayout(context);
-        chips.setOrientation(LinearLayout.HORIZONTAL);
-        chips.setPadding(AndroidUtilities.dp(6), 0, AndroidUtilities.dp(6), 0);
-        chipsScroll.addView(chips);
-        for (String[] chip : CHIPS) {
-            TextView view = new TextView(context);
-            view.setText(chip[0]);
-            view.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
-            view.setTextColor(textColor);
-            view.setGravity(Gravity.CENTER);
-            view.setPadding(AndroidUtilities.dp(12), 0, AndroidUtilities.dp(12), 0);
-            GradientDrawable background = new GradientDrawable();
-            background.setCornerRadius(AndroidUtilities.dp(16));
-            background.setColor(Theme.getColor(Theme.key_chat_emojiSearchBackground, resourcesProvider));
-            view.setBackground(background);
-            view.setOnClickListener(v -> {
-                if (chip[1] == null) {
-                    ForkDialogs.createFieldAlert(context, "Search GIPHY", query, result -> {
-                        load(result.trim());
-                        return null;
-                    });
-                } else {
-                    load(chip[1]);
-                }
-            });
-            chips.addView(view, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 32, 0, 0, 4, 0, 4, 0));
-        }
-        addView(chipsScroll, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 44, Gravity.TOP, 0, 6, 0, 0));
 
         listView = new RecyclerListView(context);
         GridLayoutManager layoutManager = new GridLayoutManager(context, 3);
@@ -177,7 +138,7 @@ public class MyGiphyView extends FrameLayout {
                 send(view, gifs.get(position));
             }
         });
-        addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.TOP, 0, 54, 0, 0));
+        addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.TOP, 0, 0, 0, 0));
 
         emptyView = new TextView(context);
         emptyView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
@@ -189,15 +150,36 @@ public class MyGiphyView extends FrameLayout {
                 askKey(context, () -> load(query));
             }
         });
-        addView(emptyView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.TOP, 0, 54, 0, 0));
+        addView(emptyView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.TOP, 0, 0, 0, 0));
 
         TextView attribution = new TextView(context);
         attribution.setText("Powered by GIPHY");
         attribution.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 10);
         attribution.setTextColor(textColor);
         attribution.setAlpha(0.6f);
-        addView(attribution, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP | Gravity.RIGHT, 0, 50, 10, 0));
+        addView(attribution, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.RIGHT, 0, 0, 12, 52));
     }
+
+    // EmojiView hook: its search bar sits on top, the grid starts below it.
+    public void setSearchField(View field, int height) {
+        addView(field, new LayoutParams(LayoutParams.MATCH_PARENT, height, Gravity.TOP));
+        ((LayoutParams) listView.getLayoutParams()).topMargin = height;
+        ((LayoutParams) emptyView.getLayoutParams()).topMargin = height;
+    }
+
+    // EmojiView hook: called on every keystroke, on clear (null) and with a category's emoji list.
+    public void search(String text) {
+        String q = text == null ? "" : text.trim();
+        if (!q.isEmpty() && !q.matches(".*[\\p{L}\\p{N}].*")) {
+            q = new String(Character.toChars(q.codePointAt(0))); // a category: search its first emoji
+        }
+        AndroidUtilities.cancelRunOnUIThread(pendingSearch);
+        String finalQuery = q;
+        pendingSearch = () -> load(finalQuery);
+        AndroidUtilities.runOnUIThread(pendingSearch, 400);
+    }
+
+    private Runnable pendingSearch;
 
     @Override
     protected void onAttachedToWindow() {
