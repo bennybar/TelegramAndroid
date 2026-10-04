@@ -878,7 +878,7 @@ public class EmojiView extends FrameLayout implements
                         if (!delegate.isSearchOpened()) {
                             openSearch(SearchField.this);
                         }
-                        delegate.onSearchOpenClose(type == 1 ? 2 : 1);
+                        delegate.onSearchOpenClose(type == 1 || type == 0 && myGiphyView != null ? 2 : 1);
                         searchEditText.requestFocus();
                         AndroidUtilities.showKeyboard(searchEditText);
                     }
@@ -898,7 +898,8 @@ public class EmojiView extends FrameLayout implements
             searchEditText.setCursorColor(getThemedColor(Theme.key_featuredStickers_addedIcon));
             searchEditText.setCursorSize(dp(20));
             searchEditText.setCursorWidth(1.5f);
-            searchEditText.setTranslationY(org.telegram.ui.MyUiTweaks.emojiSearchTextOffset());
+            searchEditText.setTranslationY(dp(-2));
+            searchEditText.setIncludeFontPadding(false);
             inputBox.addView(searchEditText, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 40, Gravity.LEFT | Gravity.TOP, 0, 0, 28, 0));
             searchEditText.addTextChangedListener(new TextWatcher() {
                 @Override
