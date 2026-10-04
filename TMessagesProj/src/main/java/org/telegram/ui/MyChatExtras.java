@@ -74,6 +74,19 @@ public class MyChatExtras {
         return isPinInHeader(chat) ? View.GONE : visibility;
     }
 
+    public static boolean inputMatchesMessages() {
+        return MessagesController.getGlobalMainSettings().getBoolean("inputMatchesMessages", true);
+    }
+
+    public static void toggleInputMatchesMessages() {
+        MessagesController.getGlobalMainSettings().edit().putBoolean("inputMatchesMessages", !inputMatchesMessages()).apply();
+    }
+
+    // ChatActivityEnterView hook: the message field uses the chat text size instead of Telegram's fixed 18dp.
+    public static int inputTextSize() {
+        return inputMatchesMessages() ? org.telegram.messenger.SharedConfig.fontSize : 18;
+    }
+
     public static void toggle(String key) {
         MessagesController.getGlobalMainSettings().edit().putBoolean(key, !MessagesController.getGlobalMainSettings().getBoolean(key, false)).apply();
     }

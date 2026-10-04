@@ -5891,7 +5891,7 @@ public class ChatActivityEnterView extends FrameLayout implements
         updateFieldHint(false);
         messageEditText.setSingleLine(false);
         messageEditText.setMaxLines(6);
-        messageEditText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 18);
+        messageEditText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, org.telegram.ui.MyChatExtras.inputTextSize());
         messageEditText.setGravity(Gravity.BOTTOM);
         org.telegram.messenger.MyRtl.applyToInput(messageEditText);
         messageEditText.setPadding(0, dp(9), 0, dp(10));
