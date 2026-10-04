@@ -12526,6 +12526,13 @@ public class ChatActivityEnterView extends FrameLayout implements
                                         accountInstance.getMessagesController().saveGif(parent, document);
                                     }
                                 }
+                            } else if (gif instanceof MediaController.SearchImage) {
+                                // GIPHY tab (org.telegram.ui.MyGiphyView): a downloaded mp4 sent as a GIF.
+                                ArrayList<SendMessagesHelper.SendingMediaInfo> photos = new ArrayList<>();
+                                SendMessagesHelper.SendingMediaInfo info = new SendMessagesHelper.SendingMediaInfo();
+                                info.searchImage = (MediaController.SearchImage) gif;
+                                photos.add(info);
+                                SendMessagesHelper.prepareSendingMedia(AccountInstance.getInstance(currentAccount), photos, dialog_id, replyingMessageObject, getThreadMessage(), storyItem, replyingQuote, false, false, null, notify, scheduleDate, scheduleRepeatPeriod, 0, false, null, parentFragment != null ? parentFragment.getMessageChatSendParams() : null, effectId, invertMedia, stars, getSendMonoForumPeerId(), getSendMessageSuggestionParams());
                             } else if (gif instanceof TLRPC.BotInlineResult) {
                                 TLRPC.BotInlineResult result = (TLRPC.BotInlineResult) gif;
 

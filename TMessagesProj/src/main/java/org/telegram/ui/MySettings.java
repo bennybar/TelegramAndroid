@@ -141,6 +141,8 @@ public class MySettings {
     private static final int ID_INPUT_SIZE = 225;
     private static final int ID_PIN_EMOJI_SEARCH = 226;
     private static final int ID_HIDE_EMOJI_TITLES = 227;
+    private static final int ID_GIPHY = 228;
+    private static final int ID_GIPHY_KEY = 229;
     private static final int ID_CLUTTER_BASE = 230; // 230..235, one per MyChatTweaks.CLUTTER_KEYS
     private static final String[][] CLUTTER_ROWS = {
         {"Star reactions", "The ⭐ paid reaction in reaction bars and under posts."},
@@ -251,6 +253,9 @@ public class MySettings {
             .setChecked(MyUiTweaks.pinEmojiSearch()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_HIDE_EMOJI_TITLES, "Hide emoji section titles", "No \"Emoji & People\", \"Recently used\" and similar titles between emoji.")
             .setChecked(MyUiTweaks.hideEmojiTitles()).setMultiline(true));
+        items.add(next++, UItem.asButtonCheck(ID_GIPHY, "GIPHY instead of Stickers", "The Stickers tab in the emoji panel becomes a GIPHY tab: trending GIFs, quick moods and search. Sent as normal GIFs.")
+            .setChecked(MyGiphyView.enabled()).setMultiline(true));
+        items.add(next++, UItem.asSettingsCell(ID_GIPHY_KEY, "GIPHY API key", MyGiphyView.apiKey().isEmpty() ? "Not set" : "Set"));
         items.add(next, UItem.asShadow("Reopen Tegram after changing any of these."));
         items.add(UItem.asHeader("Google push"));
         String relay = MyFcmDistributor.relayUrl();
@@ -262,7 +267,7 @@ public class MySettings {
     // SettingsBackup hook: also back up Telegram's notification settings, other accounts' settings and this
     // build's own preference files (AI, Google push relay, reminders).
     public static java.util.List<String> extraBackupPrefs() {
-        java.util.List<String> names = new ArrayList<>(Arrays.asList("Notifications", "myai", "mypush", "myreminders"));
+        java.util.List<String> names = new ArrayList<>(Arrays.asList("Notifications", "myai", "mypush", "myreminders", "mygiphy"));
         for (int account = 1; account < 10; account++) {
             names.add("mainconfig" + account);
             names.add("Notifications" + account);
@@ -272,7 +277,7 @@ public class MySettings {
 
     // The OpenAI key stays out of the (plain text) backup file.
     public static boolean skipInBackup(String prefsName, String key) {
-        return "myai".equals(prefsName) && "apiKey".equals(key);
+        return ("myai".equals(prefsName) || "mygiphy".equals(prefsName)) && "apiKey".equals(key);
     }
 
     public static boolean onClick(BaseFragment fragment, UItem item, Runnable refresh) {
@@ -292,6 +297,16 @@ public class MySettings {
             MyChatTweaks.toggle(MyChatTweaks.CLUTTER_KEYS[item.id - ID_CLUTTER_BASE]);
             refresh.run();
             BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply everywhere.").show();
+            return true;
+        }
+        if (item.id == ID_GIPHY) {
+            MyGiphyView.toggle();
+            refresh.run();
+            BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Applies to chats opened from now on.").show();
+            return true;
+        }
+        if (item.id == ID_GIPHY_KEY) {
+            MyGiphyView.askKey(fragment.getParentActivity(), refresh);
             return true;
         }
         if (item.id == ID_PIN_EMOJI_SEARCH || item.id == ID_HIDE_EMOJI_TITLES) {
