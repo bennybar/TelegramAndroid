@@ -263,6 +263,7 @@ public class EmojiView extends FrameLayout implements
     private GridLayoutManager stickersLayoutManager;
     private TrendingAdapter trendingAdapter;
     private SearchField stickersSearchField;
+    private org.telegram.ui.MyGiphyView myGiphyView;
     private FoundStickerPacksHeaderCell stickerSearchHeader;
     private int stickersMinusDy;
     private boolean firstStickersAttach = true;
@@ -1037,7 +1038,9 @@ public class EmojiView extends FrameLayout implements
         }
 
         public void search(String text, boolean delay) {
-            if (type == 0) {
+            if (type == 0 && myGiphyView != null) {
+                myGiphyView.search(text);
+            } else if (type == 0) {
                 stickersSearchGridAdapter.search(text, delay);
             } else if (type == 1) {
                 emojiSearchAdapter.search(text, delay);
@@ -2327,9 +2330,10 @@ public class EmojiView extends FrameLayout implements
 
             Tab stickersTabHolder = new Tab();
             stickersTabHolder.type = TAB_STICKERS;
-            stickersTabHolder.view = org.telegram.ui.MyGiphyView.enabled()
-                ? new org.telegram.ui.MyGiphyView(context, resourcesProvider, (cell, gif, query) -> { if (delegate != null) delegate.onGifSelected(cell, gif, query, null, true, 0, 0); })
-                : stickersContainer;
+            if (org.telegram.ui.MyGiphyView.enabled()) {
+                myGiphyView = new org.telegram.ui.MyGiphyView(context, resourcesProvider, (cell, gif, query) -> { if (delegate != null) delegate.onGifSelected(cell, gif, query, null, true, 0, 0); });
+            }
+            stickersTabHolder.view = myGiphyView != null ? myGiphyView : stickersContainer;
             allTabs.add(stickersTabHolder);
             stickersSearchGridAdapter = new StickersSearchGridAdapter(context);
             stickersGridView.setAdapter(stickersGridAdapter = new StickersGridAdapter(context));
@@ -2375,6 +2379,11 @@ public class EmojiView extends FrameLayout implements
                 }
             };
             stickersContainer.addView(stickersSearchField, new FrameLayout.LayoutParams(LayoutHelper.MATCH_PARENT, searchFieldHeight + AndroidUtilities.getShadowHeight()));
+            if (myGiphyView != null) {
+                // The page-2 search bar (keyboard handling, clear, categories) searches GIPHY instead.
+                stickersContainer.removeView(stickersSearchField);
+                myGiphyView.setSearchField(stickersSearchField, searchFieldHeight + AndroidUtilities.getShadowHeight());
+            }
 
             stickerSearchHeader = new FoundStickerPacksHeaderCell(context, resourcesProvider);
             stickerSearchHeader.setVisibility(View.GONE);
@@ -5078,6 +5087,10 @@ public class EmojiView extends FrameLayout implements
             return;
         }
         if (stickersSearchField == null || stickersGridView == null) {
+            return;
+        }
+        if (myGiphyView != null) {
+            stickersSearchField.setTranslationY(0);
             return;
         }
 
