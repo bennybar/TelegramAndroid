@@ -2327,7 +2327,9 @@ public class EmojiView extends FrameLayout implements
 
             Tab stickersTabHolder = new Tab();
             stickersTabHolder.type = TAB_STICKERS;
-            stickersTabHolder.view = stickersContainer;
+            stickersTabHolder.view = org.telegram.ui.MyGiphyView.enabled()
+                ? new org.telegram.ui.MyGiphyView(context, resourcesProvider, (cell, gif, query) -> { if (delegate != null) delegate.onGifSelected(cell, gif, query, null, true, 0, 0); })
+                : stickersContainer;
             allTabs.add(stickersTabHolder);
             stickersSearchGridAdapter = new StickersSearchGridAdapter(context);
             stickersGridView.setAdapter(stickersGridAdapter = new StickersGridAdapter(context));
@@ -2743,7 +2745,7 @@ public class EmojiView extends FrameLayout implements
                 public void onPageSelected(int position) {
                     saveNewPage();
                     showBackspaceButton(position == 0, true);
-                    showStickerSettingsButton(position == 2 && (shouldDrawBackground || shouldDrawStickerSettings), true);
+                    showStickerSettingsButton(position == 2 && !org.telegram.ui.MyGiphyView.enabled() && (shouldDrawBackground || shouldDrawStickerSettings), true);
                     if (delegate.isSearchOpened()) {
                         if (position == 0) {
                             if (emojiSearchField != null) {
@@ -8690,7 +8692,7 @@ public class EmojiView extends FrameLayout implements
                 case 1:
                     return getString(R.string.AccDescrGIFs);
                 case 2:
-                    return getString(R.string.AccDescrStickers);
+                    return org.telegram.ui.MyGiphyView.enabled() ? "GIPHY" : getString(R.string.AccDescrStickers);
             }
             return null;
         }
