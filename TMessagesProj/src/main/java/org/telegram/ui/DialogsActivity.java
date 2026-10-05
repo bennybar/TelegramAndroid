@@ -2204,7 +2204,8 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                     parentPage.swipeController.swipeFolderBack = true;
                     ViewHolder viewHolder = parentPage.swipeController.currentItemViewHolder;
                     if (action == MotionEvent.ACTION_UP && viewHolder != null && viewHolder.itemView instanceof DialogCell) {
-                        markAsReadBySwipe(((DialogCell) viewHolder.itemView).getDialogId());
+                        long did = ((DialogCell) viewHolder.itemView).getDialogId();
+                        MySwipes.perform(DialogsActivity.this, MySwipes.action(true, did), did, () -> markAsReadBySwipe(did));
                     }
                 }
                 if (!parentPage.itemTouchhelper.isIdle() && parentPage.swipeController.swipingFolder) {
@@ -2220,7 +2221,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
                                 } else {
                                     TLRPC.Dialog dialog = getMessagesController().dialogs_dict.get(dialogId);
                                     if (swipeLeftToCatchUp(dialogId)) {
-                                        MyCatchUp.run(DialogsActivity.this, dialogId, () -> markAsReadBySwipe(dialogId));
+                                        MySwipes.perform(DialogsActivity.this, MySwipes.action(false, dialogId), dialogId, () -> markAsReadBySwipe(dialogId));
                                     } else if (dialog != null) {
                                         performSwipeAction(dialogId, dialog);
                                     }
@@ -9718,13 +9719,14 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         }
     }
 
-    // Fork setting: left-to-right marks read, right-to-left shows an AI catch-up of the chat (MyCatchUp).
+    // MySwipes: whether left-to-right swiping is on for this chat.
     private boolean customSwipes(long did) {
-        return MessagesController.getGlobalMainSettings().getBoolean("swipeRightToRead", false) && !DialogObject.isFolderDialogId(did) && !ChatObject.isCommunity(currentAccount, did);
+        return MySwipes.action(true, did) != MySwipes.NONE && !DialogObject.isFolderDialogId(did) && !ChatObject.isCommunity(currentAccount, did);
     }
 
+    // MySwipes: right-to-left does our own action (read / AI catch-up) instead of Telegram's swipe action.
     private boolean swipeLeftToCatchUp(long did) {
-        return customSwipes(did) && !DialogObject.isEncryptedDialog(did); // secret chats are never sent to OpenAI
+        return MySwipes.action(false, did) != MySwipes.NONE && !DialogObject.isFolderDialogId(did) && !ChatObject.isCommunity(currentAccount, did);
     }
 
     private void markAsReadBySwipe(long did) {

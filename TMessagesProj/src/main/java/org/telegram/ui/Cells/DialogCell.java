@@ -3982,14 +3982,14 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
             }
 
             final boolean swipeRight = translationX > 0;
-            if (swipeRight) {
+            final int mySwipe = swipeRight ? org.telegram.ui.MySwipes.action(true, currentDialogId)
+                : translationX < 0 && currentDialogFolderId == 0 && !promoDialog && !isDialogCommunity() ? org.telegram.ui.MySwipes.action(false, currentDialogId) : 0;
+            if (mySwipe == org.telegram.ui.MySwipes.READ) {
                 backgroundColor = Theme.getColor(Theme.key_chats_archiveBackground, resourcesProvider);
                 revealBackgroundColor = Theme.getColor(Theme.key_chats_archivePinBackground, resourcesProvider);
                 swipeMessage = getString(swipeMessageStringId = R.string.SwipeMarkAsRead);
                 translationDrawable = Theme.dialogs_swipeReadDrawable;
-            } else if (translationX < 0 && currentDialogFolderId == 0 && !promoDialog && !isDialogCommunity()
-                    && MessagesController.getGlobalMainSettings().getBoolean("swipeRightToRead", false)
-                    && !DialogObject.isEncryptedDialog(currentDialogId)) {
+            } else if (mySwipe == org.telegram.ui.MySwipes.CATCH_UP) {
                 backgroundColor = Theme.getColor(Theme.key_chats_archiveBackground, resourcesProvider);
                 revealBackgroundColor = Theme.getColor(Theme.key_chats_archivePinBackground, resourcesProvider);
                 swipeMessage = getString(swipeMessageStringId = R.string.MyCatchUp);
