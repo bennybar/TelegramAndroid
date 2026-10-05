@@ -159,7 +159,13 @@ public class MySettings {
         addOwnItems(items);
         for (int i = 0; i < items.size(); i++) {
             if (items.get(i).id == ForkSettingsActivity.ID_SWIPE_RIGHT_TO_READ) {
-                items.add(i + 1, UItem.asButtonCheck(ID_CATCH_UP_MARKS_READ, "Catch-up marks chat as read", "After the right-to-left AI summary, mark the chat as read.")
+                // The fork's single toggle becomes a choice per direction (MySwipes).
+                items.remove(i);
+                items.add(i++, UItem.asHeader("Swipe left → right"));
+                items.add(i++, UItem.asSlideView(MySwipes.LEFT_TO_RIGHT_LABELS, MySwipes.leftToRight(), MySwipes::setLeftToRight));
+                items.add(i++, UItem.asHeader("Swipe right → left"));
+                items.add(i++, UItem.asSlideView(MySwipes.RIGHT_TO_LEFT_LABELS, MySwipes.rightToLeft(), MySwipes::setRightToLeft));
+                items.add(i, UItem.asButtonCheck(ID_CATCH_UP_MARKS_READ, "Catch-up marks chat as read", "After an AI catch-up swipe, mark the chat as read. \"Telegram's\" uses the swipe set in Chat Settings.")
                     .setChecked(MyCatchUp.marksRead()).setMultiline(true));
                 break;
             }
