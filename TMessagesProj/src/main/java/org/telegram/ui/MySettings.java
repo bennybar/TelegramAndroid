@@ -143,6 +143,8 @@ public class MySettings {
     private static final int ID_HIDE_EMOJI_TITLES = 227;
     private static final int ID_GIPHY = 228;
     private static final int ID_GIPHY_KEY = 229;
+    private static final int ID_YESTERDAY = 240;
+    private static final int ID_DIM_MUTED = 241;
     private static final int ID_CLUTTER_BASE = 230; // 230..235, one per MyChatTweaks.CLUTTER_KEYS
     private static final String[][] CLUTTER_ROWS = {
         {"Star reactions", "The ⭐ paid reaction in reaction bars and under posts."},
@@ -211,6 +213,10 @@ public class MySettings {
             .setChecked(MyChatListSize.ticksUnderTime()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_PINNED_TINT, "Tint pinned chats", "A faint accent background on pinned chats instead of the pin next to the time.")
             .setChecked(MyUiTweaks.pinnedTint()).setMultiline(true));
+        items.add(next++, UItem.asButtonCheck(ID_YESTERDAY, "\"Yesterday\" in the chat list", "Chats from yesterday show \"Yesterday\" instead of a time or weekday.")
+            .setChecked(MyUiTweaks.yesterdayLabel()).setMultiline(true));
+        items.add(next++, UItem.asButtonCheck(ID_DIM_MUTED, "Dim muted chats", "Muted chats are drawn faded, so unmuted ones stand out.")
+            .setChecked(MyUiTweaks.dimMuted()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_COMPACT_SEARCH, "Compact search bar", "A slimmer search field above the chat list.")
             .setChecked(MyUiTweaks.compactSearch()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_MD3_TAB_BAR, "Material bottom bar", "A flat, full-width Material 3 bar instead of the floating glass one.")
@@ -297,6 +303,11 @@ public class MySettings {
             MyChatTweaks.toggle(MyChatTweaks.CLUTTER_KEYS[item.id - ID_CLUTTER_BASE]);
             refresh.run();
             BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply everywhere.").show();
+            return true;
+        }
+        if (item.id == ID_YESTERDAY || item.id == ID_DIM_MUTED) {
+            MyUiTweaks.toggle(item.id == ID_YESTERDAY ? "yesterdayLabel" : "dimMuted");
+            refresh.run();
             return true;
         }
         if (item.id == ID_GIPHY) {
