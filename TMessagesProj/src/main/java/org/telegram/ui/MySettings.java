@@ -219,7 +219,7 @@ public class MySettings {
             .setChecked(MyChatListSize.badgeOnPhoto()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_BADGE_BORDER, "Blue border on photo badge", "Makes the unread count on the photo stand out, muted chats included.")
             .setChecked(MyChatListSize.badgeBorder()).setMultiline(true));
-        items.add(next++, UItem.asButtonCheck(ID_TICKS_UNDER_TIME, "Read ticks under the time", "The ✓✓ move from beside the time to the line below it. Best with the unread count on the photo.")
+        items.add(next++, UItem.asButtonCheck(ID_TICKS_UNDER_TIME, "Read ticks under the time", "The ✓✓ move from beside the time to the line below it. Best with the unread count on the photo. Not used with Mirror chat list, where they stay beside the time.")
             .setChecked(MyChatListSize.ticksUnderTime()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_PINNED_TINT, "Tint pinned chats", "A faint accent background on pinned chats instead of the pin next to the time.")
             .setChecked(MyUiTweaks.pinnedTint()).setMultiline(true));

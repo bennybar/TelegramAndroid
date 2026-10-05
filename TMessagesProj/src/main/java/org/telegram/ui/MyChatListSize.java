@@ -27,6 +27,12 @@ public class MyChatListSize {
         return MessagesController.getGlobalMainSettings().getBoolean("ticksUnderTime", false);
     }
 
+    // DialogCell: in the mirrored list the time sits at the far left, where ticks under it would overlap the
+    // preview, so they stay beside the time (Telegram's right-to-left placement, right of the time) instead.
+    public static boolean ticksUnderTimeActive() {
+        return ticksUnderTime() && !org.telegram.messenger.MyRtl.mirrorList();
+    }
+
     public static boolean badgeBorder() {
         return MessagesController.getGlobalMainSettings().getBoolean("badgeBorder", false);
     }
