@@ -284,7 +284,7 @@ public class MySettings {
         items.add(UItem.asHeader("Google push"));
         String relay = MyFcmDistributor.relayUrl();
         items.add(UItem.asSettingsCell(ID_GOOGLE_PUSH_RELAY, "Google push relay", relay.isEmpty() ? "Not set" : Uri.parse(relay).getHost()));
-        items.add(UItem.asShadow("Your own relay (gateway/cloudflare-worker) lets Tegram receive notifications through Google Play Services, without ntfy. "
+        items.add(UItem.asShadow((relay.isEmpty() ? "" : MyFcmDistributor.lastPushText() + " ") + "Your own relay (gateway/cloudflare-worker) lets Tegram receive notifications through Google Play Services, without ntfy. "
             + "After setting it, pick this app as the UnifiedPush distributor in Notifications and Sounds."));
     }
 
@@ -301,7 +301,8 @@ public class MySettings {
 
     // The OpenAI key stays out of the (plain text) backup file.
     public static boolean skipInBackup(String prefsName, String key) {
-        return ("myai".equals(prefsName) || "mygiphy".equals(prefsName)) && "apiKey".equals(key);
+        return ("myai".equals(prefsName) || "mygiphy".equals(prefsName)) && "apiKey".equals(key)
+            || "mypush".equals(prefsName) && "lastPush".equals(key); // device state, not a setting
     }
 
     private static void restartBulletin(BaseFragment fragment, String text) {

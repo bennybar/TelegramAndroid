@@ -27,6 +27,16 @@ public class MyFcmDistributor extends EmbeddedDistributorReceiver {
         return prefs().getString("vapidKey", "");
     }
 
+    // Wall-clock time of the last push that reached the app, to tell "nothing is arriving" from a quiet day.
+    public static void markPushReceived() {
+        prefs().edit().putLong("lastPush", System.currentTimeMillis()).apply();
+    }
+
+    public static String lastPushText() {
+        long last = prefs().getLong("lastPush", 0);
+        return last == 0 ? "No push received yet." : "Last push received " + android.text.format.DateUtils.getRelativeTimeSpanString(last, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS) + ".";
+    }
+
     public static boolean isConfigured() {
         return !relayUrl().isEmpty() && !vapidKey().isEmpty();
     }

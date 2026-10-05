@@ -401,8 +401,40 @@ async function fcmTarget(env, token) {
   return { endpoint, auth };
 }
 
+// One log line per request, kept by Workers Logs (wrangler.toml [observability]): the route (never the path,
+// which carries the push token), the outcome and the time taken. 201 = forwarded to the phone's push service,
+// 200 = duplicate wake-up dropped (its message already arrived), anything else = refused or failed.
+function routeName(request) {
+  const path = new URL(request.url).pathname;
+  if (path.startsWith("/fcm/")) return `fcm-${request.method.toLowerCase()}`;
+  if (path === "/aesgcm") return "aesgcm";
+  return request.method === "PUT" ? "put" : "other";
+}
+
+function outcome(status) {
+  if (status === 201) return "forwarded";
+  if (status === 200) return "deduplicated";
+  if (status === 403) return "refused";
+  return status >= 500 ? "failed" : "rejected";
+}
+
 export default {
   async fetch(request, env) {
+    const started = Date.now();
+    const response = await handle(request, env);
+    console.log(JSON.stringify({
+      route: routeName(request),
+      status: response.status,
+      outcome: outcome(response.status),
+      ms: Date.now() - started,
+      from: request.headers.get("CF-Connecting-IP"),
+    }));
+    return response;
+  },
+};
+
+async function handle(request, env) {
+  {
     const clientIp = request.headers.get("CF-Connecting-IP");
     if (!clientIp) return new Response("Missing client IP", { status: 400 });
 
@@ -460,5 +492,5 @@ export default {
     }
 
     return new Response(null, { status: 405 });
-  },
-};
+  }
+}
