@@ -5,3 +5,8 @@ compatibility_date = "2026-06-01"
 # VAPID_PRIVATE_KEY and VAPID_PUBLIC_KEY are secrets, set with
 # `wrangler secret put <name>`. Without them the /fcm routes answer 503 and
 # every other route keeps working.
+
+# Keep logs (one line per push, see worker.mjs) searchable in the dashboard for a few days,
+# instead of only live via `wrangler tail`.
+[observability]
+enabled = true

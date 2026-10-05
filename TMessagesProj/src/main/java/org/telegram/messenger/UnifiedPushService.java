@@ -204,6 +204,7 @@ public class UnifiedPushService extends PushService {
         final CountDownLatch countDownLatch = new CountDownLatch(1);
 
         lastReceivedNotification = SystemClock.elapsedRealtime();
+        MyFcmDistributor.markPushReceived(); // shown as "Last push received" in the Google push settings
         markEndpointReceived();
         numOfReceivedNotifications++;
 
