@@ -9,7 +9,7 @@ SECRETS="$HOME/.config/forkclient/release.env"   # APP_ID=... and APP_HASH=...
 KEYS="$HOME/StudioProjects/kitzi-android/key.properties"
 
 cd "$(git rev-parse --show-toplevel)"
-export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"   # AGP rejects Java 23
+export JAVA_HOME="$(/usr/libexec/java_home -v 17)"   # AGP/buildSrc reject newer Javas (23, Studio 2026.2's bundled 25)
 export ANDROID_HOME="$HOME/Library/Android/sdk"
 export PATH="/opt/homebrew/opt/rustup/bin:$PATH"   # rustup's cargo, which has the Android targets
 
