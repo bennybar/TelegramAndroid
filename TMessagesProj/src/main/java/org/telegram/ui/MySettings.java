@@ -145,6 +145,7 @@ public class MySettings {
     private static final int ID_GIPHY_KEY = 229;
     private static final int ID_YESTERDAY = 240;
     private static final int ID_DIM_MUTED = 241;
+    private static final int ID_TIME_GAPS = 242;
     private static final int ID_CLUTTER_BASE = 230; // 230..235, one per MyChatTweaks.CLUTTER_KEYS
     private static final String[][] CLUTTER_ROWS = {
         {"Star reactions", "The ⭐ paid reaction in reaction bars and under posts."},
@@ -247,6 +248,8 @@ public class MySettings {
             .setChecked(MyChatExtras.pinnedInHeader()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_INPUT_SIZE, "Input matches message size", "The message field uses the same text size as the messages, instead of Telegram's larger fixed size.")
             .setChecked(MyChatExtras.inputMatchesMessages()).setMultiline(true));
+        items.add(next++, UItem.asButtonCheck(ID_TIME_GAPS, "Time headers after a pause", "A small time label above a message sent more than an hour after the previous one, like iMessage.")
+            .setChecked(MyTimeGaps.enabled()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_TYPING_BUBBLE, "Typing bubble", "An animated ••• bubble at the bottom of the chat while the other side types.")
             .setChecked(MyChatExtras.typingBubble()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_READ_LABEL, "\"Read\" under your last message", "Sending… / Delivered / Read below your newest message, like iMessage.")
@@ -309,6 +312,11 @@ public class MySettings {
             MyChatTweaks.toggle(MyChatTweaks.CLUTTER_KEYS[item.id - ID_CLUTTER_BASE]);
             refresh.run();
             BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply everywhere.").show();
+            return true;
+        }
+        if (item.id == ID_TIME_GAPS) {
+            MyTimeGaps.toggle();
+            refresh.run();
             return true;
         }
         if (item.id == ID_YESTERDAY || item.id == ID_DIM_MUTED) {

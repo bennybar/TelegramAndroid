@@ -7100,6 +7100,7 @@ public class ChatActivity extends BaseFragment implements
             }
         });
         chatListView.setLayoutManager(chatLayoutManager);
+        chatListView.addItemDecoration(new MyTimeGaps(this)); // iMessage-style time headers, when on
         chatListView.addItemDecoration(new RecyclerView.ItemDecoration() {
             @Override
             public void getItemOffsets(Rect outRect, View view, RecyclerView parent, RecyclerView.State state) {
