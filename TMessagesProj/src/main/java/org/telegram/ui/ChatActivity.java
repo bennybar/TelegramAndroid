@@ -4197,6 +4197,8 @@ public class ChatActivity extends BaseFragment implements
                     getSendMessagesHelper().sendMessage(SendMessagesHelper.SendMessageParams.of("/help", dialog_id, null, null, null, false, null, null, null, true, 0, 0, null, false));
                 } else if (id == bot_settings) {
                     getSendMessagesHelper().sendMessage(SendMessagesHelper.SendMessageParams.of("/settings", dialog_id, null, null, null, false, null, null, null, true, 0, 0, null, false));
+                } else if (MyAiChat.onHeaderItem(ChatActivity.this, id)) {
+                    // "✦ Ask this chat"
                 } else if (id == search) {
                     openSearchWithText(isSupportedTags() ? "" : null);
                 } else if (id == translate) {
@@ -4673,6 +4675,7 @@ public class ChatActivity extends BaseFragment implements
             if (searchItem != null) {
                 headerItem.lazilyAddSubItem(search, R.drawable.msg_search, LocaleController.getString(R.string.Search));
             }
+            MyAiChat.addHeaderItem(headerItem, dialog_id);
             if (ChatObject.isBoostSupported(currentChat) && !MyChatTweaks.hideBoost() && (getUserConfig().isPremium() || ChatObject.isBoosted(chatInfo) || ChatObject.hasAdminRights(currentChat))) {
                 RLottieDrawable drawable = new RLottieDrawable(R.raw.boosts, dp(24), dp(24));
                 headerItem.lazilyAddSubItem(boost_group, drawable, LocaleController.getString(ChatObject.isChannelAndNotMegaGroup(currentChat) ? R.string.BoostingBoostChannelMenu : R.string.BoostingBoostGroupMenu));
@@ -34148,7 +34151,7 @@ public class ChatActivity extends BaseFragment implements
         if (selectedObject == null || getParentActivity() == null) {
             return;
         }
-        if (MyReminders.handleOption(this, option, selectedObject)) {
+        if (MyReminders.handleOption(this, option, selectedObject) || MyAiChat.handleOption(this, option, selectedObject)) {
             closeMenu();
             return;
         }
@@ -47108,6 +47111,7 @@ public class ChatActivity extends BaseFragment implements
             icons.add(R.drawable.outline_revert_24);
         }
         MyReminders.addMenuItem(selectedObject, icons, items, options);
+        MyAiChat.addMenuItem(selectedObject, dialog_id, icons, items, options);
     }
 
     private boolean showWelcomeMessageRevertOption(MessageObject messageObject) {

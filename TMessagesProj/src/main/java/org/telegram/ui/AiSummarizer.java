@@ -58,6 +58,12 @@ public class AiSummarizer {
         "Merge them into one summary in exactly the same format, combining duplicate chat sections and the \"Needs you\" section. " +
         "Keep the [r..] references.\n\n" + SYSTEM_PROMPT;
 
+    private static final String ASK_PROMPT =
+        "You answer the user's question about a Telegram chat. The user appears as \"Me\". " +
+        "Answer in the language of the question, concisely. Support each point with 1 or 2 source references copied " +
+        "from the input, like [r12]. Only use references that appear in the input. " +
+        "If the messages don't contain the answer, say so plainly. Never invent facts.";
+
     // Pointer from an [rN] reference back to the original message.
     public static class Ref {
         public final long dialogId;
@@ -131,6 +137,28 @@ public class AiSummarizer {
         }
         TLRPC.Chat chat = controller.getChat(-did);
         return chat == null ? "Unknown" : chat.title;
+    }
+
+    private String question;
+
+    // "Ask this chat" (MyAiChat): answer this question from the newest collected messages instead of summarizing.
+    public void setQuestion(String question) {
+        this.question = question;
+    }
+
+    // One prompt, one answer, off the UI thread (MyAiChat's Explain / Summarize / Translate).
+    public static void askOnce(String system, String user, Utilities.Callback<String> onDone, Utilities.Callback<String> onError) {
+        String key = prefs().getString("apiKey", "");
+        String model = prefs().getString("model", DEFAULT_MODEL);
+        Utilities.globalQueue.postRunnable(() -> {
+            try {
+                String answer = complete(key, model, system, user);
+                AndroidUtilities.runOnUIThread(() -> onDone.run(answer));
+            } catch (Exception e) {
+                String message = TextUtils.isEmpty(e.getMessage()) ? e.toString() : e.getMessage();
+                AndroidUtilities.runOnUIThread(() -> onError.run(message));
+            }
+        });
     }
 
     // Only collect messages newer than this id (e.g. the chat's last read message).
@@ -296,12 +324,19 @@ public class AiSummarizer {
         if (chunk.length() > 0) {
             chunks.add(chunk.toString());
         }
+        if (question != null) {
+            // A question is answered from the newest chunk only: one request, no merge step.
+            String newest = chunks.isEmpty() ? "" : chunks.get(chunks.size() - 1);
+            chunks.clear();
+            chunks.add("Question: " + question + "\n\n" + newest);
+        }
+        String system = question != null ? ASK_PROMPT : SYSTEM_PROMPT;
         Utilities.globalQueue.postRunnable(() -> {
             try {
                 String summary;
                 if (chunks.size() == 1) {
-                    AndroidUtilities.runOnUIThread(() -> callback.onProgress("Summarizing…"));
-                    summary = complete(key, model, SYSTEM_PROMPT, chunks.get(0));
+                    AndroidUtilities.runOnUIThread(() -> callback.onProgress(question != null ? "Thinking…" : "Summarizing…"));
+                    summary = complete(key, model, system, chunks.get(0));
                 } else {
                     StringBuilder partials = new StringBuilder();
                     for (int i = 0; i < chunks.size(); i++) {
