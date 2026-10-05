@@ -4198,7 +4198,7 @@ public class ChatActivity extends BaseFragment implements
                 } else if (id == bot_settings) {
                     getSendMessagesHelper().sendMessage(SendMessagesHelper.SendMessageParams.of("/settings", dialog_id, null, null, null, false, null, null, null, true, 0, 0, null, false));
                 } else if (MyAiChat.onHeaderItem(ChatActivity.this, id)) {
-                    // "✦ Ask this chat"
+                    // "Ask this chat"
                 } else if (id == search) {
                     openSearchWithText(isSupportedTags() ? "" : null);
                 } else if (id == translate) {
@@ -34152,7 +34152,7 @@ public class ChatActivity extends BaseFragment implements
         if (selectedObject == null || getParentActivity() == null) {
             return;
         }
-        if (MyReminders.handleOption(this, option, selectedObject) || MyAiChat.handleOption(this, option, selectedObject)) {
+        if (MyReminders.handleOption(this, option, selectedObject) || MyAiChat.handleOption(this, option, MyAiChat.textMessage(selectedObject, selectedObjectGroup))) {
             closeMenu();
             return;
         }
@@ -47112,7 +47112,7 @@ public class ChatActivity extends BaseFragment implements
             icons.add(R.drawable.outline_revert_24);
         }
         MyReminders.addMenuItem(selectedObject, icons, items, options);
-        MyAiChat.addMenuItem(selectedObject, dialog_id, icons, items, options);
+        MyAiChat.addMenuItem(MyAiChat.textMessage(selectedObject, selectedObjectGroup), dialog_id, icons, items, options);
     }
 
     private boolean showWelcomeMessageRevertOption(MessageObject messageObject) {
