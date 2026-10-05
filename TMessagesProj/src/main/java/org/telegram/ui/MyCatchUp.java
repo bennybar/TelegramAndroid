@@ -2,6 +2,7 @@ package org.telegram.ui;
 
 import android.app.Activity;
 
+import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessageObject;
@@ -40,6 +41,10 @@ public class MyCatchUp {
 
     // ChatActivity hook: make the "Unread messages" divider offer a summary of everything below it.
     public static void bindUnreadCell(ChatActivity chat, ChatUnreadCell cell, long dialogId, ArrayList<MessageObject> messages, MessageObject divider) {
+        // Center the label on the blue bar: the bar starts 7dp down a 40dp cell (center 20.5dp) while the text is
+        // centered in the cell 1dp higher, and font padding pushed it further off.
+        cell.getTextView().setIncludeFontPadding(false);
+        cell.getTextView().setTranslationY(AndroidUtilities.dp(1));
         if (DialogObject.isEncryptedDialog(dialogId) || AiSummarizer.prefs().getString("apiKey", "").isEmpty()) {
             cell.setOnClickListener(null);
             cell.setClickable(false);
