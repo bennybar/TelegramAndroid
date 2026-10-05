@@ -16369,6 +16369,7 @@ public class ChatActivity extends BaseFragment implements
         if (chatListView == null || fragmentView == null) {
             return;
         }
+        MyUnread.update(this, unreadMessageObject != null, chatLayoutManager != null && chatLayoutManager.findFirstVisibleItemPosition() == 0 && forwardEndReached[0], () -> removeUnreadPlane(false));
         int count = chatListView.getChildCount();
         int height = chatListView.getMeasuredHeight();
         int minPositionHolder = Integer.MAX_VALUE;
@@ -38886,7 +38887,7 @@ public class ChatActivity extends BaseFragment implements
                 } else if (view instanceof ChatUnreadCell) {
                     ChatUnreadCell unreadCell = (ChatUnreadCell) view;
                     unreadCell.setText(LocaleController.getString(R.string.UnreadMessages));
-                    MyCatchUp.bindUnreadCell(ChatActivity.this, unreadCell, dialog_id, messages, unreadMessageObject);
+                    MyUnread.bindCell(unreadCell, messages, unreadMessageObject, themeDelegate);
                     unreadCell.getTextView().setTranslationX(getSideMenuWidth() / 2f);
                     if (createUnreadMessageAfterId != 0) {
                         createUnreadMessageAfterId = 0;
