@@ -19673,6 +19673,7 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                             StaticLayout.Builder slb = StaticLayout.Builder.obtain(stringFinalText, 0, stringFinalText.length(), textPaint, maxWidth)
                                 .setAlignment(Layout.Alignment.ALIGN_NORMAL)
+                                .setTextDirection(org.telegram.messenger.MyRtl.textDirection())
                                 .setIncludePad(false);
                             slb.setBreakStrategy(LineBreaker.BREAK_STRATEGY_SIMPLE);
                             if (isReplyQuote && !currentMessageObject.replyTextRevealed) {
