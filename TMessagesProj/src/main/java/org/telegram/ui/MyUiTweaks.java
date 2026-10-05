@@ -129,6 +129,29 @@ public class MyUiTweaks {
         editText.setTranslationY(AndroidUtilities.dp(4));
     }
 
+    // LocaleController.stringForMessageListDate hook: "Yesterday" in the chat list instead of a time or weekday.
+    public static boolean yesterdayLabel() {
+        return pref("yesterdayLabel");
+    }
+
+    public static String yesterday() {
+        String text = org.telegram.messenger.LocaleController.getString(org.telegram.messenger.R.string.Yesterday);
+        return text.isEmpty() ? text : Character.toUpperCase(text.charAt(0)) + text.substring(1);
+    }
+
+    // DialogCell hook: muted chats drawn faded, so unmuted ones stand out without re-sorting.
+    public static boolean dimMuted() {
+        return pref("dimMuted");
+    }
+
+    public static void saveRow(Canvas canvas, View cell, boolean muted) {
+        if (muted && dimMuted()) {
+            canvas.saveLayerAlpha(0, 0, cell.getWidth(), cell.getHeight(), 125);
+        } else {
+            canvas.save();
+        }
+    }
+
     public static boolean pinEmojiSearch() {
         return pref("pinEmojiSearch");
     }

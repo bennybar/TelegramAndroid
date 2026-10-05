@@ -3865,7 +3865,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
     protected void onDraw(Canvas canvas) {
         final boolean myPrevRtl = org.telegram.messenger.MyRtl.beginMirror(); // mirrored chat list rows
         final int myRowShift = MyChatListSize.rowShiftPx(); // row spacing: center the content in the taller row
-        canvas.save();
+        MyUiTweaks.saveRow(canvas, this, dialogMuted && !drawUnmute); // dims muted chats when that's on
         canvas.translate(0, myRowShift);
         try {
         if (currentDialogId == 0 && customDialog == null) {
