@@ -1,6 +1,7 @@
 package org.telegram.ui;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Build;
@@ -146,6 +147,7 @@ public class MySettings {
     private static final int ID_YESTERDAY = 240;
     private static final int ID_DIM_MUTED = 241;
     private static final int ID_TIME_GAPS = 242;
+    private static final int ID_RESTART = 243;
     private static final int ID_CLUTTER_BASE = 230; // 230..235, one per MyChatTweaks.CLUTTER_KEYS
     private static final String[][] CLUTTER_ROWS = {
         {"Star reactions", "The ⭐ paid reaction in reaction bars and under posts."},
@@ -210,6 +212,7 @@ public class MySettings {
         items.add(next++, UItem.asHeader("Chat list photo size"));
         items.add(next++, UItem.asSlideView(MyChatListSize.AVATAR_LABELS, MyChatListSize.avatarIndex(), MyChatListSize::setAvatarIndex));
         items.add(next++, UItem.asShadow(null));
+        items.add(next++, UItem.asHeader("Chat list"));
         items.add(next++, UItem.asButtonCheck(ID_DIVIDERS, "List dividers", "A thin line between chats, with the same margin on both sides.")
             .setChecked(MyChatListSize.dividers()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_BADGE_ON_PHOTO, "Unread count on photo", "The unread count sits on the photo's top corner, like app icon badges.")
@@ -234,14 +237,6 @@ public class MySettings {
         items.add(next++, UItem.asHeader("Inside chats"));
         items.add(next++, UItem.asButtonCheck(ID_DOUBLE_TAP_REPLY, "Double-tap to reply", "Double-tap a message to reply to it, instead of sending a reaction.")
             .setChecked(MyChatTweaks.doubleTapReply()).setMultiline(true));
-        items.add(next++, UItem.asShadow(null));
-        items.add(next++, UItem.asHeader("Hide clutter"));
-        for (int i = 0; i < CLUTTER_ROWS.length; i++) {
-            items.add(next++, UItem.asButtonCheck(ID_CLUTTER_BASE + i, CLUTTER_ROWS[i][0], CLUTTER_ROWS[i][1])
-                .setChecked(MyChatTweaks.isOn(MyChatTweaks.CLUTTER_KEYS[i])).setMultiline(true));
-        }
-        items.add(next++, UItem.asButtonCheck(ID_HIDE_GIFT, "Hide gift button", "No gift button in any chat, including channels and groups.")
-            .setChecked(MyChatTweaks.hideGiftButton()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_CENTERED_HEADER, "Centered chat header", "The photo and name sit in the middle of the chat's top bar, like iMessage.")
             .setChecked(MyChatExtras.centeredHeader()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_PINNED_HEADER, "Pinned message in header", "Hide the pinned-message bar; a pin icon in the top bar (in place of the call icon) jumps to it.")
@@ -254,24 +249,38 @@ public class MySettings {
             .setChecked(MyChatExtras.typingBubble()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_READ_LABEL, "\"Read\" under your last message", "Sending… / Delivered / Read below your newest message, like iMessage.")
             .setChecked(MyChatExtras.readLabel()).setMultiline(true));
+        items.add(next++, UItem.asShadow(null));
+        items.add(next++, UItem.asHeader("Message bubble width"));
+        items.add(next++, UItem.asSlideView(MyChatTweaks.BUBBLE_LABELS, MyChatTweaks.bubbleIndex(), MyChatTweaks::setBubbleIndex));
+        items.add(next++, UItem.asShadow(null));
+        items.add(next++, UItem.asHeader("Hebrew / right-to-left"));
         items.add(next++, UItem.asButtonCheck(ID_PREFER_RTL, "Prefer right-to-left", "Messages with any Hebrew in them read right-to-left, even when they start with an English word, number, link or emoji. Also while typing.")
             .setChecked(MyRtl.preferRtl()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_MIRROR_LIST, "Mirror chat list", "Right-to-left chat rows, like Telegram in Hebrew: photo on the right, time on the left. Menus stay in English.")
             .setChecked(MyRtl.mirrorList()).setMultiline(true));
         items.add(next++, UItem.asShadow(null));
-        items.add(next++, UItem.asHeader("Message bubble width"));
-        items.add(next++, UItem.asSlideView(MyChatTweaks.BUBBLE_LABELS, MyChatTweaks.bubbleIndex(), MyChatTweaks::setBubbleIndex));
-        items.add(next++, UItem.asShadow(null));
         items.add(next++, UItem.asHeader("Emoji panel height"));
         items.add(next++, UItem.asSlideView(MyUiTweaks.EMOJI_HEIGHT_LABELS, MyUiTweaks.emojiHeightIndex(), MyUiTweaks::setEmojiHeightIndex));
+        items.add(next++, UItem.asShadow(null));
+        items.add(next++, UItem.asHeader("Emoji & GIF"));
         items.add(next++, UItem.asButtonCheck(ID_PIN_EMOJI_SEARCH, "Keep emoji search on top", "The emoji search bar stays put instead of scrolling away.")
             .setChecked(MyUiTweaks.pinEmojiSearch()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_HIDE_EMOJI_TITLES, "Hide emoji section titles", "No \"Emoji & People\", \"Recently used\" and similar titles between emoji.")
             .setChecked(MyUiTweaks.hideEmojiTitles()).setMultiline(true));
-        items.add(next++, UItem.asButtonCheck(ID_GIPHY, "GIPHY instead of Stickers", "The Stickers tab in the emoji panel becomes a GIPHY tab: trending GIFs, quick moods and search. Sent as normal GIFs.")
+        items.add(next++, UItem.asButtonCheck(ID_GIPHY, "GIPHY instead of Stickers", "The Stickers tab in the emoji panel becomes a GIPHY tab: trending GIFs and search. Sent as normal GIFs.")
             .setChecked(MyGiphyView.enabled()).setMultiline(true));
         items.add(next++, UItem.asSettingsCell(ID_GIPHY_KEY, "GIPHY API key", MyGiphyView.apiKey().isEmpty() ? "Not set" : "Set"));
-        items.add(next, UItem.asShadow("Reopen Tegram after changing any of these."));
+        items.add(next++, UItem.asShadow(null));
+        items.add(next++, UItem.asHeader("Hide clutter"));
+        for (int i = 0; i < CLUTTER_ROWS.length; i++) {
+            items.add(next++, UItem.asButtonCheck(ID_CLUTTER_BASE + i, CLUTTER_ROWS[i][0], CLUTTER_ROWS[i][1])
+                .setChecked(MyChatTweaks.isOn(MyChatTweaks.CLUTTER_KEYS[i])).setMultiline(true));
+        }
+        items.add(next++, UItem.asButtonCheck(ID_HIDE_GIFT, "Hide gift button", "No gift button in any chat, including channels and groups.")
+            .setChecked(MyChatTweaks.hideGiftButton()).setMultiline(true));
+        items.add(next++, UItem.asShadow("Reopen Tegram after changing any of these."));
+        items.add(next++, UItem.asButton(ID_RESTART, "Restart Tegram now"));
+        items.add(next, UItem.asShadow(null));
         items.add(UItem.asHeader("Google push"));
         String relay = MyFcmDistributor.relayUrl();
         items.add(UItem.asSettingsCell(ID_GOOGLE_PUSH_RELAY, "Google push relay", relay.isEmpty() ? "Not set" : Uri.parse(relay).getHost()));
@@ -295,23 +304,44 @@ public class MySettings {
         return ("myai".equals(prefsName) || "mygiphy".equals(prefsName)) && "apiKey".equals(key);
     }
 
+    private static void restartBulletin(BaseFragment fragment, String text) {
+        BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, text, "Restart", () -> restart(fragment.getParentActivity())).show();
+    }
+
+    // Relaunch the app's main screen in a fresh process, so settings read at startup apply.
+    public static void restart(Context context) {
+        if (context == null) {
+            return;
+        }
+        Intent launch = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+        if (launch == null || launch.getComponent() == null) {
+            return;
+        }
+        context.startActivity(Intent.makeRestartActivityTask(launch.getComponent()));
+        Runtime.getRuntime().exit(0);
+    }
+
     public static boolean onClick(BaseFragment fragment, UItem item, Runnable refresh) {
         if (item.id == ID_BADGE_ON_PHOTO || item.id == ID_TICKS_UNDER_TIME || item.id == ID_BADGE_BORDER) {
             MyChatListSize.toggle(item.id == ID_BADGE_ON_PHOTO ? "badgeOnPhoto" : item.id == ID_TICKS_UNDER_TIME ? "ticksUnderTime" : "badgeBorder");
             refresh.run();
-            BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply.").show();
+            restartBulletin(fragment, "Reopen Tegram to apply.");
             return true;
         }
         if (item.id == ID_MIRROR_LIST) {
             MyRtl.toggleMirrorList();
             refresh.run();
-            BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply.").show();
+            restartBulletin(fragment, "Reopen Tegram to apply.");
             return true;
         }
         if (item.id >= ID_CLUTTER_BASE && item.id < ID_CLUTTER_BASE + CLUTTER_ROWS.length) {
             MyChatTweaks.toggle(MyChatTweaks.CLUTTER_KEYS[item.id - ID_CLUTTER_BASE]);
             refresh.run();
-            BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply everywhere.").show();
+            restartBulletin(fragment, "Reopen Tegram to apply everywhere.");
+            return true;
+        }
+        if (item.id == ID_RESTART) {
+            restart(fragment.getParentActivity());
             return true;
         }
         if (item.id == ID_TIME_GAPS) {
@@ -371,7 +401,7 @@ public class MySettings {
         if (item.id == ID_PREFER_RTL) {
             MyRtl.togglePreferRtl();
             refresh.run();
-            BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply.").show();
+            restartBulletin(fragment, "Reopen Tegram to apply.");
             return true;
         }
         if (item.id == ID_DOUBLE_TAP_REPLY) {
@@ -382,13 +412,13 @@ public class MySettings {
         if (item.id == ID_MD3_TAB_BAR || item.id == ID_HIDE_PROFILE_TAB || item.id == ID_COMPACT_SEARCH || item.id == ID_PINNED_TINT) {
             MyUiTweaks.toggle(item.id == ID_MD3_TAB_BAR ? "md3TabBar" : item.id == ID_HIDE_PROFILE_TAB ? "hideProfileTab" : item.id == ID_COMPACT_SEARCH ? "compactSearch" : "pinnedTint");
             refresh.run();
-            BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply.").show();
+            restartBulletin(fragment, "Reopen Tegram to apply.");
             return true;
         }
         if (item.id == ID_DIVIDERS) {
             MyChatListSize.toggle("chatListDividers");
             refresh.run();
-            BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply.").show();
+            restartBulletin(fragment, "Reopen Tegram to apply.");
             return true;
         }
         if (item.id == ID_GOOGLE_SANS) {
@@ -397,7 +427,7 @@ public class MySettings {
                 SharedConfig.toggleUseSystemBoldFont();
             }
             refresh.run();
-            BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply.").show();
+            restartBulletin(fragment, "Reopen Tegram to apply.");
             return true;
         }
         if (item.id == ID_DEVICE_FONT) {
@@ -406,7 +436,7 @@ public class MySettings {
             }
             SharedConfig.toggleUseSystemBoldFont();
             refresh.run();
-            BulletinFactory.of(fragment).createSimpleBulletin(R.raw.contacts_sync_on, "Reopen Tegram to apply.").show();
+            restartBulletin(fragment, "Reopen Tegram to apply.");
             return true;
         }
         if (item.id == ID_CATCH_UP_MARKS_READ) {
