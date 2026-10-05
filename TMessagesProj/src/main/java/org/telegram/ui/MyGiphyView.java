@@ -19,10 +19,13 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.R;
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.Utilities;
 import org.telegram.messenger.forkgram.ForkDialogs;
+import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.BackupImageView;
 import org.telegram.ui.Components.LayoutHelper;
@@ -75,6 +78,8 @@ public class MyGiphyView extends FrameLayout {
         });
     }
 
+    private static final int PAGE = 50;
+
     private static class Gif {
         String preview, still, send;
         int width, height;
@@ -87,6 +92,8 @@ public class MyGiphyView extends FrameLayout {
     private String query = "";
     private int requestId;
     private boolean loaded;
+    private boolean loadingMore;
+    private boolean endReached;
 
     public MyGiphyView(Context context, Theme.ResourcesProvider resourcesProvider, Delegate delegate) {
         super(context);
@@ -137,6 +144,22 @@ public class MyGiphyView extends FrameLayout {
         listView.setOnItemClickListener((view, position) -> {
             if (position >= 0 && position < gifs.size()) {
                 send(view, gifs.get(position));
+            }
+        });
+        listView.setOnItemLongClickListener((view, position) -> {
+            if (position >= 0 && position < gifs.size()) {
+                showPreview(view, gifs.get(position), resourcesProvider);
+                return true;
+            }
+            return false;
+        });
+        listView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
+                // Endless scrolling: fetch the next page when 2 rows from the end.
+                if (dy > 0 && !loadingMore && !endReached && !gifs.isEmpty() && layoutManager.findLastVisibleItemPosition() >= gifs.size() - 6) {
+                    fetch(true);
+                }
             }
         });
         addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.TOP, 0, 0, 0, 0));
@@ -197,26 +220,37 @@ public class MyGiphyView extends FrameLayout {
 
     private void load(String newQuery) {
         query = newQuery == null ? "" : newQuery;
-        String key = apiKey();
-        if (TextUtils.isEmpty(key)) {
+        if (TextUtils.isEmpty(apiKey())) {
             gifs.clear();
             listView.getAdapter().notifyDataSetChanged();
             showMessage("Tap to set your GIPHY API key (free from developers.giphy.com).");
             return;
         }
         loaded = true;
-        int id = ++requestId;
         showMessage("Loading…");
+        fetch(false);
+    }
+
+    private void fetch(boolean append) {
+        String key = apiKey();
+        int id = ++requestId;
+        int offset = append ? gifs.size() : 0;
+        loadingMore = true;
         String q = query;
         Utilities.globalQueue.postRunnable(() -> {
             ArrayList<Gif> result = new ArrayList<>();
             String error = null;
+            boolean end = false;
             try {
-                String url = q.isEmpty()
-                    ? "https://api.giphy.com/v1/gifs/trending?limit=60&api_key=" + URLEncoder.encode(key, "UTF-8")
-                    : "https://api.giphy.com/v1/gifs/search?limit=60&api_key=" + URLEncoder.encode(key, "UTF-8")
-                        + "&q=" + URLEncoder.encode(q, "UTF-8") + (q.matches(".*[\\u0590-\\u05FF].*") ? "&lang=he" : "");
-                JSONArray data = new JSONObject(get(url)).getJSONArray("data");
+                String url = (q.isEmpty()
+                    ? "https://api.giphy.com/v1/gifs/trending?limit=" + PAGE + "&api_key=" + URLEncoder.encode(key, "UTF-8")
+                    : "https://api.giphy.com/v1/gifs/search?limit=" + PAGE + "&api_key=" + URLEncoder.encode(key, "UTF-8")
+                        + "&q=" + URLEncoder.encode(q, "UTF-8") + (q.matches(".*[\\u0590-\\u05FF].*") ? "&lang=he" : ""))
+                    + "&offset=" + offset;
+                JSONObject response = new JSONObject(get(url));
+                JSONArray data = response.getJSONArray("data");
+                JSONObject pagination = response.optJSONObject("pagination");
+                end = data.length() == 0 || pagination != null && offset + data.length() >= pagination.optInt("total_count", Integer.MAX_VALUE);
                 for (int i = 0; i < data.length(); i++) {
                     JSONObject images = data.getJSONObject(i).getJSONObject("images");
                     JSONObject preview = images.optJSONObject("fixed_width");
@@ -238,8 +272,17 @@ public class MyGiphyView extends FrameLayout {
                 error = "Couldn't load GIFs. Check the GIPHY API key and your connection.";
             }
             String finalError = error;
+            boolean finalEnd = end;
             AndroidUtilities.runOnUIThread(() -> {
                 if (id != requestId) {
+                    return;
+                }
+                loadingMore = false;
+                endReached = finalEnd || finalError != null;
+                if (append) {
+                    int start = gifs.size();
+                    gifs.addAll(result);
+                    listView.getAdapter().notifyItemRangeInserted(start, result.size());
                     return;
                 }
                 gifs.clear();
@@ -249,6 +292,25 @@ public class MyGiphyView extends FrameLayout {
                 showMessage(finalError != null ? finalError : result.isEmpty() ? "No GIFs found." : null);
             });
         });
+    }
+
+    // Long press: a bigger, playing preview with Send / Cancel.
+    private void showPreview(View cell, Gif gif, Theme.ResourcesProvider resourcesProvider) {
+        int width = AndroidUtilities.dp(260);
+        int height = gif.width > 0 && gif.height > 0 ? Math.min(AndroidUtilities.dp(360), width * gif.height / gif.width) : width;
+        FrameLayout frame = new FrameLayout(getContext());
+        BackupImageView image = new BackupImageView(getContext());
+        image.setRoundRadius(AndroidUtilities.dp(10));
+        image.getImageReceiver().setAllowStartAnimation(true);
+        image.getImageReceiver().setAutoRepeat(1);
+        image.setImage(ImageLocation.getForPath(gif.preview), width + "_" + height, gif.still != null ? ImageLocation.getForPath(gif.still) : null, width + "_" + height, 0, null);
+        frame.addView(image, new LayoutParams(width, height, Gravity.CENTER));
+        frame.setPadding(0, AndroidUtilities.dp(16), 0, 0);
+        new AlertDialog.Builder(getContext(), resourcesProvider)
+            .setView(frame)
+            .setPositiveButton(LocaleController.getString(R.string.Send), (dialog, which) -> send(cell, gif))
+            .setNegativeButton(LocaleController.getString(R.string.Cancel), null)
+            .show();
     }
 
     private void send(View cell, Gif gif) {
