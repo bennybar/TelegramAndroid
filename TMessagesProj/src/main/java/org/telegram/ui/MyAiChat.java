@@ -17,8 +17,8 @@ import org.telegram.ui.Components.BulletinFactory;
 import java.util.ArrayList;
 
 // AI in chats, with the OpenAI key from the AI tab. Secret chats are never sent.
-// - Message menu "✦ AI": Explain / Summarize / Translate one message.
-// - Chat menu "✦ Ask this chat": a question answered from recent history, with [rN] links to the source messages.
+// - Message menu "Ask AI": Explain / Summarize / Translate one message.
+// - Chat menu "Ask this chat": a question answered from recent history, with [rN] links to the source messages.
 //   History is read with the same paced requests as the summaries (AiSummarizer).
 public class MyAiChat {
 
@@ -36,7 +36,18 @@ public class MyAiChat {
         return message == null || message.messageOwner == null || message.messageOwner.message == null ? "" : message.messageOwner.message.trim();
     }
 
-    // fillMessageMenu hook: "✦ AI" above Delete, for messages with text or a caption.
+    // The message whose text to use: in an album only one item carries the caption.
+    public static MessageObject textMessage(MessageObject message, MessageObject.GroupedMessages group) {
+        if (TextUtils.isEmpty(text(message)) && group != null) {
+            MessageObject caption = group.findCaptionMessageObject();
+            if (caption != null) {
+                return caption;
+            }
+        }
+        return message;
+    }
+
+    // fillMessageMenu hook: "Ask AI" above Delete, for messages with text or a caption.
     public static void addMenuItem(MessageObject message, long dialogId, ArrayList<Integer> icons, ArrayList<CharSequence> items, ArrayList<Integer> options) {
         if (DialogObject.isEncryptedDialog(dialogId) || TextUtils.isEmpty(text(message))) {
             return;
@@ -45,9 +56,9 @@ public class MyAiChat {
         if (index < 0) {
             index = options.size();
         }
-        items.add(index, "✦ AI");
+        items.add(index, "Ask AI");
         options.add(index, OPTION_AI);
-        icons.add(index, R.drawable.input_ai_star);
+        icons.add(index, R.drawable.summary_stars);
     }
 
     // processSelectedOption hook.
@@ -65,7 +76,7 @@ public class MyAiChat {
         }
         String text = text(message);
         AlertDialog.Builder builder = new AlertDialog.Builder(activity);
-        builder.setTitle("✦ AI");
+        builder.setTitle("Ask AI");
         builder.setItems(ACTIONS, (dialog, which) -> {
             String system;
             if (which == 0) {
@@ -93,7 +104,7 @@ public class MyAiChat {
     // ChatActivity header menu hook.
     public static void addHeaderItem(ActionBarMenuItem headerItem, long dialogId) {
         if (headerItem != null && !DialogObject.isEncryptedDialog(dialogId)) {
-            headerItem.lazilyAddSubItem(MENU_ASK, R.drawable.input_ai_star, "✦ Ask this chat");
+            headerItem.lazilyAddSubItem(MENU_ASK, R.drawable.summary_stars, "Ask this chat");
         }
     }
 
