@@ -2353,7 +2353,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         if (drawNameLock) {
             nameWidth -= dp(LocaleController.isRTL ? 8 : 4) + Theme.dialogs_lockDrawable.getIntrinsicWidth();
         }
-        if (MyChatListSize.ticksUnderTime() && (drawClock || drawCheck2)) {
+        if (MyChatListSize.ticksUnderTimeActive() && (drawClock || drawCheck2)) {
             // Read ticks / clock go under the time, in its column; the name keeps its full width.
             final int timeRight = timeLeft + timeWidth;
             if (!LocaleController.isRTL) {
@@ -2765,7 +2765,7 @@ public class DialogCell extends BaseCell implements StoriesListPlaceProvider.Ava
         if (twoLinesForName) {
             messageTop += dp(20);
         }
-        if (MyChatListSize.ticksUnderTime() && (drawClock || drawCheck2)) {
+        if (MyChatListSize.ticksUnderTimeActive() && (drawClock || drawCheck2)) {
             // Centered on the preview's first line (messageTop is final below, so add the line gap here too).
             Paint.FontMetricsInt fm = Theme.dialogs_messagePaint[paintIndex].getFontMetricsInt();
             checkDrawTop = messageTop + MyChatListSize.lineGapPx() + (fm.descent - fm.ascent - Theme.dialogs_checkDrawable.getIntrinsicHeight()) / 2;
