@@ -2,23 +2,17 @@ package org.telegram.ui;
 
 import android.app.Activity;
 
-import org.telegram.messenger.AndroidUtilities;
-import org.telegram.messenger.DialogObject;
-import org.telegram.messenger.LocaleController;
-import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
-import org.telegram.messenger.R;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.BottomSheet;
-import org.telegram.ui.Cells.ChatUnreadCell;
 import org.telegram.ui.Components.BulletinFactory;
 
 import java.util.ArrayList;
 
-// Right-to-left swipe on a chat: AI summary of its unread messages (or the last 24 hours) in a bottom sheet.
+// Chat list swipe: AI summary of a chat's unread messages (or the last 24 hours) in a bottom sheet.
 public class MyCatchUp {
 
     public static boolean marksRead() {
@@ -37,27 +31,6 @@ public class MyCatchUp {
         int since = unread ? 0 : ConnectionsManager.getInstance(account).getCurrentTime() - 24 * 3600;
         String title = AiSummarizer.chatTitle(account, dialogId) + " · " + (unread ? dialog.unread_count + " unread" : "last 24 hours");
         start(fragment, dialogId, since, unread ? dialog.read_inbox_max_id : 0, title, markRead);
-    }
-
-    // ChatActivity hook: make the "Unread messages" divider offer a summary of everything below it.
-    public static void bindUnreadCell(ChatActivity chat, ChatUnreadCell cell, long dialogId, ArrayList<MessageObject> messages, MessageObject divider) {
-        // Center the label on the blue bar: the bar starts 7dp down a 40dp cell (center 20.5dp) while the text is
-        // centered in the cell 1dp higher, and font padding pushed it further off.
-        cell.getTextView().setIncludeFontPadding(false);
-        cell.getTextView().setTranslationY(AndroidUtilities.dp(1));
-        if (DialogObject.isEncryptedDialog(dialogId) || AiSummarizer.prefs().getString("apiKey", "").isEmpty()) {
-            cell.setOnClickListener(null);
-            cell.setClickable(false);
-            return;
-        }
-        cell.setText(LocaleController.getString(R.string.UnreadMessages) + "  ·  ✦ Summarize");
-        cell.setOnClickListener(v -> {
-            // The divider sits just above the first unread message; the list is newest first.
-            int index = messages.indexOf(divider);
-            int lastReadId = index >= 0 && index + 1 < messages.size() ? messages.get(index + 1).getId() : 0;
-            String title = AiSummarizer.chatTitle(chat.getCurrentAccount(), dialogId) + " · unread";
-            start(chat, dialogId, 0, lastReadId, title, null);
-        });
     }
 
     private static void start(BaseFragment fragment, long dialogId, int since, int minMessageId, String title, Runnable markRead) {
