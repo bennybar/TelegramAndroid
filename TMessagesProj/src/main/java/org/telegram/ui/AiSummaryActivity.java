@@ -352,6 +352,10 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         textView.setLinkTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteLinkText));
         textView.setPadding(AndroidUtilities.dp(18), AndroidUtilities.dp(14), AndroidUtilities.dp(18), AndroidUtilities.dp(24));
         textView.setTextIsSelectable(true);
+        if (org.telegram.messenger.MyRtl.preferRtl()) {
+            // Per paragraph: any Hebrew makes the line right-to-left, even when it starts with a name or [r3].
+            textView.setTextDirection(View.TEXT_DIRECTION_ANY_RTL);
+        }
         textView.setText(render(summary, refs, onRef));
         textView.setMovementMethod(LinkMovementMethod.getInstance());
         scrollView.addView(textView, LayoutHelper.createScroll(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP));
