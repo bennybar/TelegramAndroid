@@ -860,10 +860,14 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         textView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
         textView.setLinkTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteLinkText));
         textView.setPadding(AndroidUtilities.dp(18), AndroidUtilities.dp(10), AndroidUtilities.dp(18), AndroidUtilities.dp(16));
-        textView.setTextIsSelectable(true);
+        // Not selectable, so dragging always scrolls; source chips stay tappable and long-press copies it all.
         textView.setTextDirection(View.TEXT_DIRECTION_ANY_RTL);
         textView.setText(render(summary, refs, onRef, textView.getPaint()));
         textView.setMovementMethod(LinkMovementMethod.getInstance());
+        textView.setOnLongClickListener(v -> {
+            AndroidUtilities.addToClipboard(plainText(summary));
+            return true;
+        });
         return textView;
     }
 
