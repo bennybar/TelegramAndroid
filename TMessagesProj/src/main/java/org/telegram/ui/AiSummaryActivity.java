@@ -75,7 +75,6 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
     private static final int[] WINDOW_MINUTES = {5, 10, 15, 30, 45, 60, 90, 120, 180, 240, 360, 480};
 
     private static final int ID_ADD = 2;
-    private static final int ID_KEY = 5;
     private static final int ID_SINCE_LAST = 6;
     private static final int ID_UNREAD_ONLY = 7;
     private static final int ID_CHAT = 100;
@@ -265,14 +264,52 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         FrameLayout frameLayout = new FrameLayout(context);
         frameLayout.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray));
         listView = new UniversalRecyclerView(this, this::fillItems, this::onClick, null);
-        if (hasMainTabs) {
-            // Keep the last rows clear of the bottom tab bar.
-            listView.setPadding(0, 0, 0, AndroidUtilities.dp(DialogsActivity.MAIN_TABS_HEIGHT_WITH_MARGINS) + AndroidUtilities.navigationBarHeight);
-            listView.setClipToPadding(false);
-        }
+        // On the tab the list runs under the top bar and above the bottom tab bar; the Summarize bar sits pinned
+        // above the tab bar, so the list leaves room for all three.
+        int bottomInset = hasMainTabs ? AndroidUtilities.dp(DialogsActivity.MAIN_TABS_HEIGHT_WITH_MARGINS) + AndroidUtilities.navigationBarHeight : 0;
+        int topInset = hasMainTabs ? ActionBar.getCurrentActionBarHeight() + (actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0) : 0;
+        listView.setPadding(0, topInset, 0, bottomInset + AndroidUtilities.dp(SUMMARIZE_BAR_DP));
+        listView.setClipToPadding(false);
         frameLayout.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+
+        summarizeBar = new FrameLayout(context);
+        summarizeBar.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray));
+        summarizeBar.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(8), AndroidUtilities.dp(16), AndroidUtilities.dp(8));
+        summarizeButton = primaryButton(context, "✦  Summarize");
+        summarizeBar.addView(summarizeButton, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 46));
+        FrameLayout.LayoutParams barParams = LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, SUMMARIZE_BAR_DP, Gravity.BOTTOM);
+        barParams.bottomMargin = bottomInset;
+        frameLayout.addView(summarizeBar, barParams);
+        updateSummarizeBar();
+
         fragmentView = frameLayout;
         return fragmentView;
+    }
+
+    private static final int SUMMARIZE_BAR_DP = 62;
+    private FrameLayout summarizeBar;
+    private TextView summarizeButton;
+
+    // The pinned button: Summarize, or "Set OpenAI API key" until there is one.
+    private void updateSummarizeBar() {
+        if (summarizeButton == null) {
+            return;
+        }
+        boolean hasKey = !AiSummarizer.prefs().getString("apiKey", "").isEmpty();
+        summarizeButton.setText(hasKey ? "✦  Summarize" : "Set OpenAI API key");
+        boolean enabled = !hasKey || !pickedChats.isEmpty();
+        summarizeButton.setEnabled(enabled);
+        summarizeButton.setAlpha(enabled ? 1f : 0.5f);
+        summarizeButton.setOnClickListener(v -> {
+            if (hasKey) {
+                startSummary();
+            } else {
+                askKey(getParentActivity(), () -> {
+                    listView.adapter.update(true);
+                    updateSummarizeBar();
+                });
+            }
+        });
     }
 
     private static int windowIndex() {
@@ -619,17 +656,6 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         return button;
     }
 
-    private View createSummarizeButton(Context context) {
-        FrameLayout frame = new FrameLayout(context);
-        frame.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(14), AndroidUtilities.dp(16), AndroidUtilities.dp(14));
-        TextView button = primaryButton(context, "✦  Summarize");
-        button.setEnabled(!pickedChats.isEmpty());
-        button.setAlpha(pickedChats.isEmpty() ? 0.5f : 1f);
-        button.setOnClickListener(v -> startSummary());
-        frame.addView(button, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 46));
-        return frame;
-    }
-
     private void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
         Context context = getContext();
         items.add(UItem.asCustom(createIntro(context)));
@@ -652,11 +678,9 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         items.add(UItem.asShadow("The list is kept until you change it. Secret chats are never sent."));
 
         if (AiSummarizer.prefs().getString("apiKey", "").isEmpty()) {
-            items.add(UItem.asButton(ID_KEY, "Set OpenAI API key").accent());
             items.add(UItem.asShadow("The digest uses your own OpenAI key. It's stored only on this phone; change it later in Tegram's settings."));
-        } else {
-            items.add(UItem.asCustom(createSummarizeButton(context)));
         }
+        updateSummarizeBar();
 
         Digest last = Digest.load();
         if (last != null) {
@@ -699,8 +723,6 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
             AiSummarizer.prefs().edit().putBoolean("digestSinceLast", !sinceLast()).apply();
             listView.adapter.update(true);
             updateEstimate();
-        } else if (item.id == ID_KEY) {
-            askKey(getParentActivity(), () -> listView.adapter.update(true));
         }
     }
 
