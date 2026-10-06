@@ -149,6 +149,7 @@ public class MySettings {
     private static final int ID_TIME_GAPS = 242;
     private static final int ID_RESTART = 243;
     private static final int ID_OPENAI_KEY = 244;
+    private static final int ID_VOICE_NAMES = 245;
     private static final int ID_CLUTTER_BASE = 230; // 230..235, one per MyChatTweaks.CLUTTER_KEYS
     private static final String[][] CLUTTER_ROWS = {
         {"Star reactions", "The ⭐ paid reaction in reaction bars and under posts."},
@@ -285,7 +286,8 @@ public class MySettings {
         String openAiKey = AiSummarizer.prefs().getString("apiKey", "");
         items.add(UItem.asHeader("AI"));
         items.add(UItem.asSettingsCell(ID_OPENAI_KEY, "OpenAI API key", openAiKey.length() > 8 ? "…" + openAiKey.substring(openAiKey.length() - 4) : "Not set"));
-        items.add(UItem.asShadow("Used by the Digest tab, Ask AI and catch-up, with gpt-5.4-mini. Stored only on this phone and never included in backups."));
+        items.add(UItem.asSettingsCell(ID_VOICE_NAMES, "Names to spell correctly", MyVoiceNotes.names().isEmpty() ? "None" : MyVoiceNotes.names()));
+        items.add(UItem.asShadow("The key is used by the Digest tab, Ask AI and catch-up (gpt-5.4-mini) and by voice-message summaries (gpt-4o-transcribe, then gpt-6.1-sol). Stored only on this phone and never included in backups. Names: comma-separated, used to fix names in voice transcripts."));
         items.add(UItem.asHeader("Google push"));
         String relay = MyFcmDistributor.relayUrl();
         items.add(UItem.asSettingsCell(ID_GOOGLE_PUSH_RELAY, "Google push relay", relay.isEmpty() ? "Not set" : Uri.parse(relay).getHost()));
@@ -344,6 +346,14 @@ public class MySettings {
             MyChatTweaks.toggle(MyChatTweaks.CLUTTER_KEYS[item.id - ID_CLUTTER_BASE]);
             refresh.run();
             restartBulletin(fragment, "Reopen Tegram to apply everywhere.");
+            return true;
+        }
+        if (item.id == ID_VOICE_NAMES) {
+            ForkDialogs.createFieldAlert(fragment.getParentActivity(), "Names to spell correctly", MyVoiceNotes.names(), result -> {
+                MyVoiceNotes.setNames(result);
+                refresh.run();
+                return null;
+            });
             return true;
         }
         if (item.id == ID_OPENAI_KEY) {
