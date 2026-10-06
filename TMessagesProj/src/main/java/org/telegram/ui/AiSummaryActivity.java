@@ -223,8 +223,9 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
     public void onResume() {
         super.onResume();
         if (listView != null) {
-            listView.adapter.update(false); // fresh counts and the last digest after reading chats
+            listView.adapter.update(false); // the last digest and source rows after reading chats
         }
+        requestCounts();
     }
 
     @Override
@@ -269,53 +270,133 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         return minutes == 60 ? "1 hour" : minutes / 60 + " hours";
     }
 
-    // New posts in a chat for the window, from local data only (no requests): exact for channels and supergroups
-    // after a digest (consecutive message ids), otherwise the unread count.
-    private int estimateNew(long did, int windowStart) {
+    // Posts per chat in the chosen window ("did:minutes"), fetched from Telegram one small request per chat and
+    // kept for 2 minutes: getHistory at the window's start, limit 1, whose offset_id_offset is the number of
+    // newer posts. Asked only after the slider settles, a quarter second apart.
+    private static final HashMap<String, Integer> postCounts = new HashMap<>();
+    private static final HashMap<String, Long> postCountTimes = new HashMap<>();
+    private Runnable pendingCount;
+    private boolean counting;
+
+    private static String countKey(long did, int minutes) {
+        return did + ":" + minutes;
+    }
+
+    // Posts in the window for this chat, or null while unknown. With "Only since last digest", channels are
+    // capped at what's newer than the last digest.
+    private Integer postsInWindow(long did) {
+        int minutes = WINDOW_MINUTES[windowIndex()];
         TLRPC.Dialog dialog = getMessagesController().dialogs_dict.get(did);
-        if (dialog == null || dialog.last_message_date < windowStart) {
+        if (dialog != null && dialog.last_message_date != 0 && dialog.last_message_date < getConnectionsManager().getCurrentTime() - minutes * 60) {
             return 0;
         }
-        Integer last = sinceLast() ? lastDigested().get(did) : null;
-        int count;
-        if (last != null && did < 0 && ChatObject.isChannel(getMessagesController().getChat(-did))) {
-            count = Math.max(0, dialog.top_message - last);
-            if (count == 0) {
-                return 0; // nothing since the last digest
-            }
-        } else {
-            count = dialog.unread_count;
+        Integer count = postCounts.get(countKey(did, minutes));
+        if (count == null || count < 0) {
+            return count == null ? null : -1;
         }
-        return Math.max(count, 1); // its newest post is in the window
+        Integer last = sinceLast() ? lastDigested().get(did) : null;
+        if (last != null && dialog != null && did < 0 && ChatObject.isChannel(getMessagesController().getChat(-did))) {
+            count = Math.min(count, Math.max(0, dialog.top_message - last));
+        }
+        return count;
+    }
+
+    private void requestCounts() {
+        if (pendingCount != null) {
+            AndroidUtilities.cancelRunOnUIThread(pendingCount);
+        }
+        pendingCount = () -> {
+            pendingCount = null;
+            int minutes = WINDOW_MINUTES[windowIndex()];
+            ArrayList<Long> todo = new ArrayList<>();
+            long now = System.currentTimeMillis();
+            for (long did : pickedChats) {
+                String key = countKey(did, minutes);
+                Long at = postCountTimes.get(key);
+                if (postsInWindow(did) == null || at != null && now - at > 120_000) {
+                    todo.add(did);
+                }
+            }
+            if (!todo.isEmpty() && !counting) {
+                counting = true;
+                countNext(todo, 0, minutes);
+            }
+        };
+        AndroidUtilities.runOnUIThread(pendingCount, 500);
+    }
+
+    private void countNext(ArrayList<Long> todo, int index, int minutes) {
+        if (index >= todo.size() || getParentActivity() == null) {
+            counting = false;
+            if (WINDOW_MINUTES[windowIndex()] != minutes) {
+                requestCounts(); // the slider moved meanwhile
+            }
+            return;
+        }
+        long did = todo.get(index);
+        int windowStart = getConnectionsManager().getCurrentTime() - minutes * 60;
+        TLRPC.TL_messages_getHistory req = new TLRPC.TL_messages_getHistory();
+        req.peer = getMessagesController().getInputPeer(did);
+        req.offset_date = windowStart;
+        req.limit = 1;
+        getConnectionsManager().sendRequest(req, (response, error) -> AndroidUtilities.runOnUIThread(() -> {
+            if (error != null && error.text != null && error.text.startsWith("FLOOD_WAIT")) {
+                counting = false; // Telegram asked to slow down: stop counting
+                return;
+            }
+            int count = -1;
+            if (response instanceof TLRPC.messages_Messages) {
+                TLRPC.messages_Messages res = (TLRPC.messages_Messages) response;
+                TLRPC.Dialog dialog = getMessagesController().dialogs_dict.get(did);
+                if (res.messages.isEmpty()) {
+                    count = res.count > 0 ? res.count : -1; // nothing older: the whole chat is in the window
+                } else if (res.offset_id_offset > 0) {
+                    count = res.offset_id_offset;
+                } else if (dialog != null && did < 0 && ChatObject.isChannel(getMessagesController().getChat(-did))) {
+                    count = Math.max(0, dialog.top_message - res.messages.get(0).id); // channel ids are consecutive
+                }
+            }
+            postCounts.put(countKey(did, minutes), count);
+            postCountTimes.put(countKey(did, minutes), System.currentTimeMillis());
+            if (listView != null) {
+                listView.adapter.update(false);
+            }
+            AndroidUtilities.runOnUIThread(() -> countNext(todo, index + 1, minutes), 250);
+        }));
     }
 
     private void updateEstimate() {
         if (estimateView == null) {
             return;
         }
-        int windowStart = getConnectionsManager().getCurrentTime() - WINDOW_MINUTES[windowIndex()] * 60;
         int total = 0;
         int chats = 0;
+        boolean unknown = false;
         for (long did : pickedChats) {
-            int n = estimateNew(did, windowStart);
-            if (n > 0) {
+            Integer n = postsInWindow(did);
+            if (n == null || n < 0) {
+                unknown = true;
+            } else if (n > 0) {
                 total += n;
                 chats++;
             }
         }
+        int color = Theme.getColor(Theme.key_windowBackgroundWhiteBlueText);
+        String text;
         if (pickedChats.isEmpty()) {
-            estimateView.setText("Add chats or channels below");
-            estimateView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
-        } else if (chats == 0) {
-            estimateView.setText(sinceLast() ? "Nothing new since the last digest" : "No posts in this time");
-            estimateView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
-        } else if (sinceLast()) {
-            estimateView.setText("≈ " + total + " new posts in " + chats + " of " + pickedChats.size() + (pickedChats.size() == 1 ? " chat" : " chats"));
-            estimateView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
+            text = "Add chats or channels below";
+            color = Theme.getColor(Theme.key_windowBackgroundWhiteGrayText);
+        } else if (unknown && total == 0) {
+            text = "Counting posts…";
+            color = Theme.getColor(Theme.key_windowBackgroundWhiteGrayText);
+        } else if (total == 0) {
+            text = sinceLast() ? "Nothing new since the last digest" : "No posts in this time";
+            color = Theme.getColor(Theme.key_windowBackgroundWhiteGrayText);
         } else {
-            estimateView.setText(chats + " of " + pickedChats.size() + (pickedChats.size() == 1 ? " chat" : " chats") + " posted in this time");
-            estimateView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
+            text = (unknown ? "At least " : "") + total + (total == 1 ? " post" : " posts") + " in " + chats + (chats == 1 ? " chat" : " chats");
         }
+        estimateView.setText(text);
+        estimateView.setTextColor(color);
     }
 
     private static TextView sectionLabel(Context context, String text) {
@@ -355,6 +436,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
                     value.setText(windowLabel(WINDOW_MINUTES[index]));
                     AndroidUtilities.vibrateCursor(slider);
                     updateEstimate();
+                    requestCounts();
                 }
             }
 
@@ -374,7 +456,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
     }
 
     // A kept chat: avatar, name, "N new · last 08:57", and ✕ to remove it from the list. Tapping opens the chat.
-    private View createSourceRow(Context context, long did, int windowStart) {
+    private View createSourceRow(Context context, long did) {
         FrameLayout row = new FrameLayout(context);
         row.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
         TLObject peer = did > 0 ? getMessagesController().getUser(did) : getMessagesController().getChat(-did);
@@ -398,16 +480,18 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         row.addView(name, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 72, 9, 56, 0));
 
         TLRPC.Dialog dialog = getMessagesController().dialogs_dict.get(did);
-        int n = estimateNew(did, windowStart);
+        Integer n = postsInWindow(did);
         TextView sub = new TextView(context);
         String lastText = dialog == null || dialog.last_message_date == 0 ? "" : " · last " + LocaleController.stringForMessageListDate(dialog.last_message_date);
         String count;
-        if (n == 0) {
+        if (n == null) {
+            count = "Counting…";
+        } else if (n < 0) {
+            count = "Posted in this time";
+        } else if (n == 0) {
             count = sinceLast() ? "Nothing new" : "No posts in this time";
-        } else if (sinceLast()) {
-            count = n + " new";
         } else {
-            count = dialog != null && dialog.unread_count > 0 ? dialog.unread_count + " unread" : "Posted in this time";
+            count = n + (n == 1 ? " post" : " posts") + (sinceLast() ? " new" : "");
         }
         sub.setText(count + lastText);
         sub.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
@@ -522,9 +606,8 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         items.add(UItem.asShadow(null));
 
         items.add(UItem.asHeader("Sources"));
-        int windowStart = getConnectionsManager().getCurrentTime() - WINDOW_MINUTES[windowIndex()] * 60;
         for (int i = 0; i < pickedChats.size(); i++) {
-            items.add(UItem.asCustom(ID_CHAT + i, createSourceRow(context, pickedChats.get(i), windowStart)));
+            items.add(UItem.asCustom(ID_CHAT + i, createSourceRow(context, pickedChats.get(i))));
         }
         items.add(UItem.asButton(ID_ADD, R.drawable.msg_add, "Add chats or channels").accent());
         items.add(UItem.asShadow("The list is kept until you change it. Secret chats are never sent."));
@@ -556,6 +639,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
                 }
                 AiSummarizer.prefs().edit().putString("pickedChats", TextUtils.join(",", pickedChats)).apply();
                 listView.adapter.update(true);
+                requestCounts();
             }, pickedChats);
             sheet.setSelectedContacts(pickedChats);
             showDialog(sheet);
@@ -571,6 +655,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         } else if (item.id == ID_SINCE_LAST) {
             AiSummarizer.prefs().edit().putBoolean("digestSinceLast", !sinceLast()).apply();
             listView.adapter.update(true);
+            updateEstimate();
         } else if (item.id == ID_KEY) {
             askKey(getParentActivity(), () -> listView.adapter.update(true));
         }
