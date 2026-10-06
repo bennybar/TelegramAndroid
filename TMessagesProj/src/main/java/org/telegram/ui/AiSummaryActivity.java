@@ -491,10 +491,15 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         private int markDigestedAsRead() {
             MessagesController controller = getMessagesController();
             android.util.LongSparseArray<Integer> newest = new android.util.LongSparseArray<>();
+            android.util.LongSparseArray<Integer> unreadDigested = new android.util.LongSparseArray<>();
             for (AiSummarizer.Ref ref : refs) {
                 Integer known = newest.get(ref.dialogId);
                 if (known == null || ref.messageId > known) {
                     newest.put(ref.dialogId, ref.messageId);
+                }
+                TLRPC.Dialog dialog = controller.dialogs_dict.get(ref.dialogId);
+                if (!ref.out && dialog != null && ref.messageId > dialog.read_inbox_max_id) {
+                    unreadDigested.put(ref.dialogId, unreadDigested.get(ref.dialogId, 0) + 1);
                 }
             }
             int now = getConnectionsManager().getCurrentTime();
@@ -502,10 +507,17 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
                 long did = newest.keyAt(i);
                 int maxId = newest.valueAt(i);
                 TLRPC.Dialog dialog = controller.dialogs_dict.get(did);
-                if (dialog != null && maxId >= dialog.top_message) {
+                boolean reachedTop = dialog == null || maxId >= dialog.top_message;
+                if (reachedTop && dialog != null && dialog.unread_mentions_count > 0) {
                     controller.markMentionsAsRead(did, 0);
                 }
-                controller.markDialogAsRead(did, maxId, maxId, now, false, 0, 0, true, 0);
+                // countDiff 0 zeroes the badge, right only when the digest reached the newest message. Otherwise
+                // subtract just the unread messages the digest included, so newer ones stay counted.
+                int countDiff = reachedTop ? 0 : unreadDigested.get(did, 0);
+                if (!reachedTop && countDiff == 0) {
+                    continue; // nothing digested here was unread
+                }
+                controller.markDialogAsRead(did, maxId, maxId, now, false, 0, countDiff, true, 0);
             }
             return newest.size();
         }
