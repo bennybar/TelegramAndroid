@@ -77,6 +77,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
     private static final int ID_ADD = 2;
     private static final int ID_KEY = 5;
     private static final int ID_SINCE_LAST = 6;
+    private static final int ID_UNREAD_ONLY = 7;
     private static final int ID_CHAT = 100;
 
     // The chats kept in this tab's list.
@@ -92,6 +93,25 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
 
     private static boolean sinceLast() {
         return AiSummarizer.prefs().getBoolean("digestSinceLast", false);
+    }
+
+    private static boolean unreadOnly() {
+        return AiSummarizer.prefs().getBoolean("digestUnreadOnly", false);
+    }
+
+    // Per chat, the first message to leave out: after the last digest and/or up to where the chat was read.
+    private HashMap<Long, Integer> startAfter() {
+        HashMap<Long, Integer> ids = sinceLast() ? lastDigested() : new HashMap<>();
+        if (unreadOnly()) {
+            for (long did : pickedChats) {
+                TLRPC.Dialog dialog = getMessagesController().dialogs_dict.get(did);
+                if (dialog != null) {
+                    Integer known = ids.get(did);
+                    ids.put(did, Math.max(known == null ? 0 : known, dialog.read_inbox_max_id));
+                }
+            }
+        }
+        return ids;
     }
 
     // Per chat, the newest message the last digest included ("did:id,did:id").
@@ -297,6 +317,9 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         if (last != null && dialog != null && did < 0 && ChatObject.isChannel(getMessagesController().getChat(-did))) {
             count = Math.min(count, Math.max(0, dialog.top_message - last));
         }
+        if (unreadOnly()) {
+            count = Math.min(count, dialog == null ? 0 : dialog.unread_count);
+        }
         return count;
     }
 
@@ -389,10 +412,10 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
             text = "Counting posts…";
             color = Theme.getColor(Theme.key_windowBackgroundWhiteGrayText);
         } else if (total == 0) {
-            text = sinceLast() ? "Nothing new since the last digest" : "No posts in this time";
+            text = unreadOnly() ? "No unread posts in this time" : sinceLast() ? "Nothing new since the last digest" : "No posts in this time";
             color = Theme.getColor(Theme.key_windowBackgroundWhiteGrayText);
         } else {
-            text = (unknown ? "At least " : "") + total + (total == 1 ? " post" : " posts") + " in " + chats + (chats == 1 ? " chat" : " chats");
+            text = (unknown ? "At least " : "") + total + (unreadOnly() ? " unread" : "") + (total == 1 ? " post" : " posts") + " in " + chats + (chats == 1 ? " chat" : " chats");
         }
         estimateView.setText(text);
         estimateView.setTextColor(color);
@@ -488,9 +511,9 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         } else if (n < 0) {
             count = "Posted in this time";
         } else if (n == 0) {
-            count = sinceLast() ? "Nothing new" : "No posts in this time";
+            count = unreadOnly() ? "Nothing unread" : sinceLast() ? "Nothing new" : "No posts in this time";
         } else {
-            count = n + (n == 1 ? " post" : " posts") + (sinceLast() ? " new" : "");
+            count = n + (unreadOnly() ? " unread" : sinceLast() ? " new" : "") + (n == 1 ? " post" : " posts");
         }
         sub.setText(count + lastText);
         sub.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
@@ -617,6 +640,8 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         items.add(UItem.asCustom(windowCard));
         items.add(UItem.asButtonCheck(ID_SINCE_LAST, "Only since last digest", "Skip posts your previous digest already covered.")
             .setChecked(sinceLast()).setMultiline(true));
+        items.add(UItem.asButtonCheck(ID_UNREAD_ONLY, "Unread messages only", "Skip posts you've already read in each chat.")
+            .setChecked(unreadOnly()).setMultiline(true));
         items.add(UItem.asShadow(null));
 
         items.add(UItem.asHeader("Sources"));
@@ -666,6 +691,10 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
                 args.putLong("chat_id", -did);
             }
             presentFragment(new ChatActivity(args));
+        } else if (item.id == ID_UNREAD_ONLY) {
+            AiSummarizer.prefs().edit().putBoolean("digestUnreadOnly", !unreadOnly()).apply();
+            listView.adapter.update(true);
+            updateEstimate();
         } else if (item.id == ID_SINCE_LAST) {
             AiSummarizer.prefs().edit().putBoolean("digestSinceLast", !sinceLast()).apply();
             listView.adapter.update(true);
@@ -711,7 +740,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
                 if (messages == 0) {
                     dismissProgress();
                     running = null;
-                    BulletinFactory.of(AiSummaryActivity.this).createErrorBulletin(sinceLast() ? "Nothing new since the last digest in this time." : "No posts in this time.").show();
+                    BulletinFactory.of(AiSummaryActivity.this).createErrorBulletin(unreadOnly() ? "No unread posts in this time." : sinceLast() ? "Nothing new since the last digest in this time." : "No posts in this time.").show();
                     return;
                 }
                 running.send();
@@ -757,9 +786,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
             }
         });
         running.setNewsDigest(windowLabel(minutes));
-        if (sinceLast()) {
-            running.setMinMessageIds(lastDigested());
-        }
+        running.setMinMessageIds(startAfter());
         running.start();
     }
 
