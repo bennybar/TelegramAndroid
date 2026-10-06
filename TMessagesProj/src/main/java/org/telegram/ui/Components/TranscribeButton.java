@@ -328,7 +328,7 @@ public class TranscribeButton {
 
     public void draw(Canvas canvas, float alpha) {
         this.pressBounds.set(this.bounds.left - dp(8), this.bounds.top - dp(8), this.bounds.right + dp(8), this.bounds.bottom + dp(8));
-        if (!isOpen && !loading && org.telegram.ui.MyVoiceNotes.drawButton(canvas, bounds, radius, alpha, parent.getMessageObject())) {
+        if (!isOpen && !loading && org.telegram.ui.MyVoiceNotes.drawButton(canvas, bounds, radius, alpha, parent)) {
             return; // Tegram's own look for the closed button
         }
         if (boundsPath == null) {

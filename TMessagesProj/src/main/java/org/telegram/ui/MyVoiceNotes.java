@@ -123,15 +123,43 @@ public class MyVoiceNotes {
         return true;
     }
 
+    // A note being processed in the background; its button spins until dismiss().
+    private static class Job {
+        final long docId;
+        java.lang.ref.WeakReference<View> cell = new java.lang.ref.WeakReference<>(null);
+
+        Job(long docId) {
+            this.docId = docId;
+        }
+
+        void setMessage(String text) {
+            // No dialog: the spinning button is the progress.
+        }
+
+        void dismiss() {
+            running.remove(docId);
+            View view = cell.get();
+            if (view != null) {
+                view.invalidate();
+            }
+        }
+    }
+
+    private static final java.util.HashMap<Long, Job> running = new java.util.HashMap<>();
+    private static Paint ringPaint;
+    private static final RectF ringRect = new RectF();
+
     private static Paint buttonPaint;
     private static Drawable sparkle;
     private static final RectF buttonRect = new RectF();
 
     // TranscribeButton hook: the closed button as an accent gradient pill with a white sparkle.
-    public static boolean drawButton(Canvas canvas, Rect bounds, int radius, float alpha, MessageObject message) {
+    public static boolean drawButton(Canvas canvas, Rect bounds, int radius, float alpha, org.telegram.ui.Cells.ChatMessageCell cell) {
+        MessageObject message = cell.getMessageObject();
         if (!useButton(message) || bounds.width() <= 0) {
             return false;
         }
+        Job job = running.get(message.getDocument().id);
         int accent = Theme.getColor(Theme.key_featuredStickers_addButton);
         int second = Theme.blendOver(accent, Theme.multAlpha(0xFF9B5CF6, 0.55f));
         if (buttonPaint == null) {
@@ -147,8 +175,30 @@ public class MyVoiceNotes {
         }
         int size = Math.min(AndroidUtilities.dp(20), Math.min(bounds.width(), bounds.height()) - AndroidUtilities.dp(6));
         sparkle.setBounds(bounds.centerX() - size / 2, bounds.centerY() - size / 2, bounds.centerX() + size / 2, bounds.centerY() + size / 2);
-        sparkle.setAlpha((int) (255 * alpha));
-        sparkle.draw(canvas);
+        sparkle.setAlpha((int) (255 * alpha * (job != null ? 0.85f : 1f)));
+        if (job != null) {
+            // Working: the sparkle turns slowly inside a spinning ring.
+            job.cell = new java.lang.ref.WeakReference<>(cell);
+            float t = (android.os.SystemClock.elapsedRealtime() % 1200) / 1200f;
+            canvas.save();
+            canvas.rotate(t * 360, bounds.centerX(), bounds.centerY());
+            sparkle.draw(canvas);
+            canvas.restore();
+            if (ringPaint == null) {
+                ringPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+                ringPaint.setStyle(Paint.Style.STROKE);
+                ringPaint.setStrokeCap(Paint.Cap.ROUND);
+            }
+            ringPaint.setStrokeWidth(AndroidUtilities.dp(1.6f));
+            ringPaint.setColor(0xFFFFFFFF);
+            ringPaint.setAlpha((int) (230 * alpha));
+            float inset = AndroidUtilities.dp(3);
+            ringRect.set(bounds.left + inset, bounds.top + inset, bounds.right - inset, bounds.bottom - inset);
+            canvas.drawArc(ringRect, t * 360 * 2, 100, false, ringPaint);
+            cell.invalidate();
+        } else {
+            sparkle.draw(canvas);
+        }
         return true;
     }
 
@@ -164,12 +214,14 @@ public class MyVoiceNotes {
             showNote(chat, message, cached);
             return;
         }
-        AlertDialog progress = new AlertDialog(activity, AlertDialog.ALERT_TYPE_SPINNER);
-        progress.setCanCancel(true);
-        progress.setCanceledOnTouchOutside(false);
+        // In the background: the button spins until it's done, then the summary pops up.
+        long docId = message.getDocument().id;
+        if (running.containsKey(docId)) {
+            return;
+        }
+        Job progress = new Job(docId);
+        running.put(docId, progress);
         boolean[] cancelled = {false};
-        progress.setOnCancelListener(d -> cancelled[0] = true);
-        progress.show();
         withFile(chat, message, progress, cancelled, file -> Utilities.globalQueue.postRunnable(() -> process(chat, message, file, progress, cancelled)));
     }
 
@@ -221,7 +273,7 @@ public class MyVoiceNotes {
 
     // ---- Pipeline (the bot's transcribe_voice) ----
 
-    private static void process(ChatActivity chat, MessageObject message, File file, AlertDialog progress, boolean[] cancelled) {
+    private static void process(ChatActivity chat, MessageObject message, File file, Job progress, boolean[] cancelled) {
         String key = AiSummarizer.prefs().getString("apiKey", "");
         File work = new File(ApplicationLoader.applicationContext.getCacheDir(), "voicenote_" + System.currentTimeMillis());
         MyAudioChunker audio = null;
@@ -331,7 +383,9 @@ public class MyVoiceNotes {
             }
             AndroidUtilities.runOnUIThread(() -> {
                 progress.dismiss();
-                showNote(chat, message, note);
+                if (LaunchActivity.getSafeLastFragment() == chat) {
+                    showNote(chat, message, note); // otherwise it's cached: the next tap shows it
+                }
             });
         } catch (Exception e) {
             FileLog.e(e);
@@ -351,7 +405,7 @@ public class MyVoiceNotes {
         }
     }
 
-    private static void setProgress(AlertDialog progress, String text) {
+    private static void setProgress(Job progress, String text) {
         AndroidUtilities.runOnUIThread(() -> progress.setMessage(text));
     }
 
@@ -542,7 +596,7 @@ public class MyVoiceNotes {
 
     // ---- Download, transcript in the bubble ----
 
-    private static void withFile(ChatActivity chat, MessageObject message, AlertDialog progress, boolean[] cancelled, Utilities.Callback<File> then) {
+    private static void withFile(ChatActivity chat, MessageObject message, Job progress, boolean[] cancelled, Utilities.Callback<File> then) {
         File file = localFile(message);
         if (file != null) {
             then.run(file);
@@ -661,8 +715,12 @@ public class MyVoiceNotes {
         view.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
         view.setLineSpacing(AndroidUtilities.dp(3), 1f);
         view.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
-        view.setTextIsSelectable(true);
+        // Not selectable, so dragging always scrolls; long-press copies the whole text.
         view.setTextDirection(View.TEXT_DIRECTION_ANY_RTL);
+        view.setOnLongClickListener(v -> {
+            AndroidUtilities.addToClipboard(text.toString());
+            return true;
+        });
         view.setPadding(AndroidUtilities.dp(18), AndroidUtilities.dp(8), AndroidUtilities.dp(18), AndroidUtilities.dp(12));
         return view;
     }
