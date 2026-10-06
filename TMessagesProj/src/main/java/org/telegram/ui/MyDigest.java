@@ -156,6 +156,7 @@ public class MyDigest {
                 onFinished.run();
             }
         });
+        running.setNewsDigest(WINDOW_HOURS + " hours");
         running.start();
     }
 
@@ -165,7 +166,7 @@ public class MyDigest {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(new NotificationChannel(CHANNEL_ID, "Morning digest", NotificationManager.IMPORTANCE_DEFAULT));
         }
-        String text = summary.replaceAll("\\s*\\[r\\d+\\]", "").replaceAll("(?m)^## ", "").replaceAll("(?m)^- ", "• ").trim();
+        String text = summary.replaceAll("\\s*\\[r\\d+\\]", "").replaceAll("(?m)^## ", "").replaceAll("(?m)^- ", "• ").replace("**", "").trim();
         String firstLine = text.contains("\n") ? text.substring(text.indexOf('\n') + 1).split("\n")[0] : text;
         Intent open = new Intent(context, LaunchActivity.class).setAction(ACTION_OPEN).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)

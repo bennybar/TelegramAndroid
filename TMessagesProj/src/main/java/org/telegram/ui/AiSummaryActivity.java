@@ -41,14 +41,15 @@ import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-// "AI" bottom tab: summarize chats over a time window with the user's own OpenAI key.
+// "Digest" bottom tab (after Scoops' digest): a news summary of the chats and channels you keep in the list, over a
+// time window from 5 minutes to 24 hours, with the user's own OpenAI key.
 public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.TabFragmentDelegate {
 
-    private static final String[] WINDOW_LABELS = {"8 hours", "1 day", "2 days", "3 days"};
-    private static final int[] WINDOW_HOURS = {8, 24, 48, 72};
+    // The time window stops, in minutes: 5 minutes to 24 hours (same as Scoops).
+    private static final int[] WINDOW_MINUTES = {5, 10, 15, 30, 45, 60, 90, 120, 180, 240, 360, 480, 720, 960, 1200, 1440};
 
-    private static final int ID_MODE_UNREAD = 1;
-    private static final int ID_MODE_PICK = 2;
+    private static final int ID_CHOOSE = 2;
+    private static final int ID_CHAT = 10;
     private static final int ID_SUMMARIZE = 3;
     private static final int ID_LAST = 4;
     private static final int ID_KEY = 5;
@@ -81,11 +82,8 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         return new ResultActivity(AiSummarizer.prefs().getString("lastTitle", ""), summary, refs);
     }
 
-    // The chats chosen in this tab: the picked list, or unread chats with activity since `since`.
+    // The chats kept in this tab's list (the Digest and the morning digest both use them).
     public static ArrayList<Long> chatsForSummary(int account, int since) {
-        if (!AiSummarizer.prefs().getBoolean("pickMode", false)) {
-            return AiSummarizer.unreadChats(account, since);
-        }
         ArrayList<Long> chats = new ArrayList<>();
         for (String did : AiSummarizer.prefs().getString("pickedChats", "").split(",")) {
             if (!did.isEmpty()) {
@@ -131,7 +129,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         if (!hasMainTabs) {
             actionBar.setBackButtonImage(R.drawable.ic_ab_back);
         }
-        actionBar.setTitle("AI summary");
+        actionBar.setTitle("Digest");
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
             @Override
             public void onItemClick(int id) {
@@ -154,27 +152,37 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         return fragmentView;
     }
 
-    private int windowIndex() {
-        return Math.max(0, Math.min(WINDOW_HOURS.length - 1, AiSummarizer.prefs().getInt("window", 1)));
+    private static int windowIndex() {
+        return Math.max(0, Math.min(WINDOW_MINUTES.length - 1, AiSummarizer.prefs().getInt("digestWindow", 5))); // 1 hour
     }
 
-    private boolean pickMode() {
-        return AiSummarizer.prefs().getBoolean("pickMode", false);
+    public static String windowLabel(int minutes) {
+        if (minutes < 60) {
+            return minutes + " minutes";
+        }
+        if (minutes % 60 != 0) {
+            return String.format(java.util.Locale.US, "%.1f hours", minutes / 60f);
+        }
+        return minutes == 60 ? "1 hour" : minutes / 60 + " hours";
     }
 
     private void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
-        items.add(UItem.asHeader("Time window"));
-        items.add(UItem.asSlideView(WINDOW_LABELS, windowIndex(), index -> AiSummarizer.prefs().edit().putInt("window", index).apply()));
+        items.add(UItem.asHeader("Posted in the last"));
+        items.add(UItem.asIntSlideView(1, 0, windowIndex(), WINDOW_MINUTES.length - 1,
+            index -> windowLabel(WINDOW_MINUTES[index]),
+            index -> AiSummarizer.prefs().edit().putInt("digestWindow", index).apply()));
         items.add(UItem.asShadow(null));
 
-        items.add(UItem.asHeader("Chats"));
-        items.add(UItem.asRadio(ID_MODE_UNREAD, "Unread chats").setChecked(!pickMode()));
-        items.add(UItem.asRadio(ID_MODE_PICK, "Choose chats", pickedChats.isEmpty() ? "" : pickedChats.size() + " selected").setChecked(pickMode()));
-        items.add(UItem.asShadow("Unread chats: private chats and groups with unread messages in the window, up to " + AiSummarizer.MAX_UNREAD_CHATS + ". Channels are skipped. Secret chats are never sent."));
+        items.add(UItem.asHeader("Chats and channels"));
+        for (int i = 0; i < pickedChats.size(); i++) {
+            items.add(UItem.asButton(ID_CHAT + i, AiSummarizer.chatTitle(currentAccount, pickedChats.get(i))));
+        }
+        items.add(UItem.asButton(ID_CHOOSE, pickedChats.isEmpty() ? "Choose chats" : "Edit list").accent());
+        items.add(UItem.asShadow("The digest reads these every time; the list is kept until you change it. Secret chats are never sent."));
 
         items.add(UItem.asButton(ID_SUMMARIZE, "Summarize").accent());
         if (AiSummarizer.prefs().contains("lastSummary")) {
-            items.add(UItem.asButton(ID_LAST, "Last summary", AiSummarizer.prefs().getString("lastTitle", "")));
+            items.add(UItem.asButton(ID_LAST, "Last digest", AiSummarizer.prefs().getString("lastTitle", "")));
         }
         items.add(UItem.asShadow(null));
 
@@ -195,11 +203,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
     }
 
     private void onClick(UItem item, View view, int position, float x, float y) {
-        if (item.id == ID_MODE_UNREAD) {
-            AiSummarizer.prefs().edit().putBoolean("pickMode", false).apply();
-            listView.adapter.update(true);
-        } else if (item.id == ID_MODE_PICK) {
-            AiSummarizer.prefs().edit().putBoolean("pickMode", true).apply();
+        if (item.id == ID_CHOOSE || item.id >= ID_CHAT && item.id < ID_CHAT + pickedChats.size()) {
             InviteMembersBottomSheet sheet = new InviteMembersBottomSheet(getContext(), currentAccount, null, 0, this, null);
             sheet.setDelegate(dids -> {
                 pickedChats.clear();
@@ -261,14 +265,14 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
             BulletinFactory.of(this).createErrorBulletin("Set your OpenAI API key first.").show();
             return;
         }
-        int index = windowIndex();
-        int since = ConnectionsManager.getInstance(currentAccount).getCurrentTime() - WINDOW_HOURS[index] * 3600;
+        int minutes = WINDOW_MINUTES[windowIndex()];
+        int since = ConnectionsManager.getInstance(currentAccount).getCurrentTime() - minutes * 60;
         ArrayList<Long> chats = chatsForSummary(currentAccount, since);
         if (chats.isEmpty()) {
-            BulletinFactory.of(this).createErrorBulletin(pickMode() ? "Choose at least one chat." : "No unread chats in this window.").show();
+            BulletinFactory.of(this).createErrorBulletin("Choose at least one chat or channel.").show();
             return;
         }
-        String title = WINDOW_LABELS[index] + " · " + chats.size() + (chats.size() == 1 ? " chat" : " chats");
+        String title = "Last " + windowLabel(minutes) + " · " + chats.size() + (chats.size() == 1 ? " chat" : " chats");
 
         progressDialog = new AlertDialog(getParentActivity(), AlertDialog.ALERT_TYPE_SPINNER);
         progressDialog.setCanCancel(true);
@@ -321,6 +325,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
                 showDialog(builder.create());
             }
         });
+        running.setNewsDigest(windowLabel(minutes));
         running.start();
     }
 
@@ -380,6 +385,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
             if (line.startsWith("- ")) {
                 line = "• " + line.substring(2);
             }
+            int lineStart = out.length();
             Matcher matcher = REF.matcher(line);
             int last = 0;
             while (matcher.find()) {
@@ -405,8 +411,28 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
                 last = matcher.end();
             }
             out.append(line, last, line.length()).append('\n');
+            applyBold(out, lineStart);
         }
         return out;
+    }
+
+    // "**key fact**" in the digest's bullets: drop the markers and bold the text between them.
+    private static void applyBold(SpannableStringBuilder out, int from) {
+        int open;
+        while ((open = indexOf(out, "**", from)) >= 0) {
+            int close = indexOf(out, "**", open + 2);
+            if (close < 0) {
+                break;
+            }
+            out.delete(close, close + 2);
+            out.delete(open, open + 2);
+            out.setSpan(new StyleSpan(Typeface.BOLD), open, close - 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            from = close - 2;
+        }
+    }
+
+    private static int indexOf(CharSequence text, String needle, int from) {
+        return text.toString().indexOf(needle, from);
     }
 
     public static void openMessage(BaseFragment fragment, AiSummarizer.Ref ref) {
@@ -437,11 +463,23 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         public View createView(Context context) {
             actionBar.setBackButtonImage(R.drawable.ic_ab_back);
             actionBar.setTitle(title);
+            // Copy / share the digest as plain text: no [rN] links, headings and bold markers dropped.
+            String plain = summary.replaceAll("\\s*\\[r\\d+\\]", "").replaceAll("(?m)^## ", "").replaceAll("(?m)^- ", "• ").replace("**", "").trim();
+            actionBar.createMenu().addItem(1, R.drawable.msg_copy);
+            actionBar.createMenu().addItem(2, R.drawable.msg_share);
             actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
                 @Override
                 public void onItemClick(int id) {
                     if (id == -1) {
                         finishFragment();
+                    } else if (id == 1) {
+                        AndroidUtilities.addToClipboard(title + "\n\n" + plain);
+                        BulletinFactory.of(ResultActivity.this).createCopyBulletin("Copied").show();
+                    } else if (id == 2 && getParentActivity() != null) {
+                        android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_SEND);
+                        intent.setType("text/plain");
+                        intent.putExtra(android.content.Intent.EXTRA_TEXT, title + "\n\n" + plain);
+                        getParentActivity().startActivity(android.content.Intent.createChooser(intent, "Share digest"));
                     }
                 }
             });

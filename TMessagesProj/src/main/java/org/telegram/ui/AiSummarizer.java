@@ -33,7 +33,7 @@ import java.util.Locale;
 // History is loaded with the same messages.getHistory requests as scrolling a chat, paced to one per second.
 public class AiSummarizer {
 
-    public static final String DEFAULT_MODEL = "gpt-4o-mini";
+    public static final String DEFAULT_MODEL = "gpt-5.4-mini"; // same default as Scoops
     public static final int MAX_UNREAD_CHATS = 30;
     private static final int MAX_MESSAGES_PER_CHAT = 1500;
     private static final int PAGE_SIZE = 100;
@@ -57,6 +57,26 @@ public class AiSummarizer {
         "You are given several partial summaries of the same set of Telegram chats, in the format below. " +
         "Merge them into one summary in exactly the same format, combining duplicate chat sections and the \"Needs you\" section. " +
         "Keep the [r..] references.\n\n" + SYSTEM_PROMPT;
+
+    // The Digest tab and the morning digest: news from the chosen chats and channels, grouped by topic (after
+    // Scoops' digest). Duplicates across channels are merged; [rN] references link back to the source posts.
+    private static final String DIGEST_PROMPT =
+        "You summarize the latest news from Telegram channels and chats the user follows. You will be given the " +
+        "messages posted in the last %s, newest first, each with a reference like [r12], its chat, its posting time " +
+        "(HH:MM) and its text. The user appears as \"Me\".\n" +
+        "Write the digest in the language most of the messages are written in.\n" +
+        "Format it as Markdown. Group related messages into topics, at most six. Give each topic a `## ` heading, " +
+        "then `-` bullets, one per distinct development, newest first, starting with its posting time (HH:MM). " +
+        "Use `**bold**` for the key fact of each bullet. Merge messages that report the same thing, even from " +
+        "different chats. End every bullet with 1 or 2 references copied from the input, like [r12]; only use " +
+        "references that appear in the input. Skip small talk, ads and promotions. Do not use tables, code blocks " +
+        "or other headings. Keep the whole digest under 450 words.\n" +
+        "Do not invent details that are not in the messages. Many are unverified first reports: describe them as " +
+        "reports, and say so plainly when messages contradict each other.";
+
+    // The digest transcript budget, shared evenly so every message makes it in: a few get up to 700
+    // characters each, a busy day gets less (never under 150).
+    private static final int DIGEST_CHARS = 40_000;
 
     private static final String ASK_PROMPT =
         "You answer the user's question about a Telegram chat. The user appears as \"Me\". " +
@@ -140,6 +160,51 @@ public class AiSummarizer {
     }
 
     private String question;
+    private String digestWindow;
+
+    // One collected message, for the digest's newest-first, evenly budgeted transcript.
+    private static class Entry {
+        final int date;
+        final String chat;
+        final String ref;
+        final String body;
+
+        Entry(int date, String chat, String ref, String body) {
+            this.date = date;
+            this.chat = chat;
+            this.ref = ref;
+            this.body = body;
+        }
+    }
+
+    private final ArrayList<Entry> entries = new ArrayList<>();
+
+    // Digest tab / morning digest: a news digest of all chats together; window names the time span ("2 hours").
+    public void setNewsDigest(String window) {
+        this.digestWindow = window;
+    }
+
+    private String digestTranscript() {
+        ArrayList<Entry> sorted = new ArrayList<>(entries);
+        java.util.Collections.sort(sorted, (a, b) -> Integer.compare(b.date, a.date));
+        int perItem = Math.max(150, Math.min(700, DIGEST_CHARS / Math.max(1, sorted.size()) - 60));
+        java.util.HashSet<String> seen = new java.util.HashSet<>();
+        SimpleDateFormat clock = new SimpleDateFormat("HH:mm", Locale.US);
+        StringBuilder out = new StringBuilder();
+        for (Entry entry : sorted) {
+            // The same post forwarded to several channels is sent once.
+            if (!seen.add(entry.body)) {
+                continue;
+            }
+            String body = entry.body.length() > perItem ? entry.body.substring(0, perItem) + "…" : entry.body;
+            String line = entry.ref + " " + entry.chat + " " + clock.format(new Date(entry.date * 1000L)) + ": " + body + "\n";
+            if (out.length() + line.length() > DIGEST_CHARS) {
+                break;
+            }
+            out.append(line);
+        }
+        return out.toString();
+    }
 
     // "Ask this chat" (MyAiChat): answer this question from the newest collected messages instead of summarizing.
     public void setQuestion(String question) {
@@ -268,6 +333,7 @@ public class AiSummarizer {
             return null;
         }
         refs.add(new Ref(did, message.id));
+        entries.add(new Entry(message.date, chatTitle(account, did), "[r" + refs.size() + "]", body.replace('\n', ' ')));
         String time = new SimpleDateFormat("EEE HH:mm", Locale.US).format(new Date(message.date * 1000L));
         return "[r" + refs.size() + "] " + time + " " + senderName(message) + (message.mentioned ? " (mentions Me)" : "") + ": " + body.replace('\n', ' ');
     }
@@ -303,6 +369,25 @@ public class AiSummarizer {
     public void send() {
         String key = prefs().getString("apiKey", "");
         String model = prefs().getString("model", DEFAULT_MODEL);
+        if (digestWindow != null) {
+            String transcript = digestTranscript();
+            String system = String.format(Locale.US, DIGEST_PROMPT, digestWindow);
+            Utilities.globalQueue.postRunnable(() -> {
+                try {
+                    AndroidUtilities.runOnUIThread(() -> callback.onProgress("Summarizing…"));
+                    String digest = complete(key, model, system, transcript);
+                    if (!cancelled) {
+                        AndroidUtilities.runOnUIThread(() -> callback.onDone(digest));
+                    }
+                } catch (Exception e) {
+                    String message = TextUtils.isEmpty(e.getMessage()) ? e.toString() : e.getMessage();
+                    if (!cancelled) {
+                        AndroidUtilities.runOnUIThread(() -> callback.onError(message));
+                    }
+                }
+            });
+            return;
+        }
         ArrayList<String> chunks = new ArrayList<>();
         StringBuilder chunk = new StringBuilder();
         for (int i = 0; i < chatTexts.length; i++) {
@@ -363,12 +448,27 @@ public class AiSummarizer {
     }
 
     private static String complete(String key, String model, String system, String user) throws Exception {
+        try {
+            return complete(key, model, system, user, true);
+        } catch (Exception e) {
+            // A model that doesn't take reasoning_effort says so in its error: ask once more without it.
+            if (e.getMessage() == null || !e.getMessage().toLowerCase(Locale.US).contains("reasoning")) {
+                throw e;
+            }
+            return complete(key, model, system, user, false);
+        }
+    }
+
+    private static String complete(String key, String model, String system, String user, boolean lowEffort) throws Exception {
         JSONObject body = new JSONObject();
         body.put("model", model);
         JSONArray messages = new JSONArray();
         messages.put(new JSONObject().put("role", "system").put("content", system));
         messages.put(new JSONObject().put("role", "user").put("content", user));
         body.put("messages", messages);
+        if (lowEffort) {
+            body.put("reasoning_effort", "low"); // a summary needs little deliberation; this is most of the latency
+        }
 
         HttpURLConnection connection = (HttpURLConnection) new URL("https://api.openai.com/v1/chat/completions").openConnection();
         connection.setRequestMethod("POST");
