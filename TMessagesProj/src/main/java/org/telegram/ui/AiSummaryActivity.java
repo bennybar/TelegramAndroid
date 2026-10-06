@@ -16,6 +16,7 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -34,6 +35,7 @@ import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.InviteMembersBottomSheet;
 import org.telegram.ui.Components.LayoutHelper;
+import org.telegram.ui.Components.SeekBarView;
 import org.telegram.ui.Components.UItem;
 import org.telegram.ui.Components.UniversalAdapter;
 import org.telegram.ui.Components.UniversalRecyclerView;
@@ -130,6 +132,53 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         return Math.max(0, Math.min(WINDOW_MINUTES.length - 1, AiSummarizer.prefs().getInt("digestWindow", 5))); // 1 hour
     }
 
+    private View windowCard;
+
+    // The time window, as in Scoops: "Posted in the last", the chosen span in large type, and a stepped slider.
+    private View createWindowCard(Context context) {
+        LinearLayout card = new LinearLayout(context);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+        card.setPadding(AndroidUtilities.dp(21), AndroidUtilities.dp(16), AndroidUtilities.dp(21), AndroidUtilities.dp(10));
+
+        TextView label = new TextView(context);
+        label.setText("Posted in the last");
+        label.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        label.setTypeface(AndroidUtilities.bold());
+        label.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+        card.addView(label);
+
+        TextView value = new TextView(context);
+        value.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 26);
+        value.setTypeface(AndroidUtilities.bold());
+        value.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+        value.setText(windowLabel(WINDOW_MINUTES[windowIndex()]));
+        card.addView(value, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 2, 0, 4));
+
+        int last = WINDOW_MINUTES.length - 1;
+        SeekBarView slider = new SeekBarView(context);
+        slider.setReportChanges(true);
+        slider.setDelegate(new SeekBarView.SeekBarViewDelegate() {
+            @Override
+            public void onSeekBarDrag(boolean stop, float progress) {
+                int index = Math.round(progress * last);
+                if (index != windowIndex()) {
+                    AiSummarizer.prefs().edit().putInt("digestWindow", index).apply();
+                    value.setText(windowLabel(WINDOW_MINUTES[index]));
+                    AndroidUtilities.vibrateCursor(slider);
+                }
+            }
+
+            @Override
+            public int getStepsCount() {
+                return last;
+            }
+        });
+        slider.setProgress(windowIndex() / (float) last);
+        card.addView(slider, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 38, 0, -15, 0, -15, 0));
+        return card;
+    }
+
     public static String windowLabel(int minutes) {
         if (minutes < 60) {
             return minutes + " minutes";
@@ -141,10 +190,10 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
     }
 
     private void fillItems(ArrayList<UItem> items, UniversalAdapter adapter) {
-        items.add(UItem.asHeader("Posted in the last"));
-        items.add(UItem.asIntSlideView(1, 0, windowIndex(), WINDOW_MINUTES.length - 1,
-            index -> windowLabel(WINDOW_MINUTES[index]),
-            index -> AiSummarizer.prefs().edit().putInt("digestWindow", index).apply()));
+        if (windowCard == null) {
+            windowCard = createWindowCard(getContext());
+        }
+        items.add(UItem.asCustom(windowCard));
         items.add(UItem.asShadow(null));
 
         items.add(UItem.asHeader("Chats and channels"));
