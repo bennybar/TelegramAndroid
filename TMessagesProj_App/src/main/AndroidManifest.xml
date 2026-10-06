@@ -54,11 +54,5 @@
                 <category android:name="android.intent.category.MULTIWINDOW_LAUNCHER" />
             </intent-filter>
         </activity-alias>
-        <!-- Morning digest (org.telegram.ui.MyDigest) -->
-        <receiver android:name="org.telegram.ui.MyDigest$AlarmReceiver" android:exported="false" />
-        <service
-            android:name="org.telegram.ui.MyDigest$Job"
-            android:exported="false"
-            android:permission="android.permission.BIND_JOB_SERVICE" />
     </application>
 </manifest>

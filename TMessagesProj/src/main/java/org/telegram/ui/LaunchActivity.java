@@ -1550,7 +1550,7 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         if (GiftInfoBottomSheet.handleIntent(intent, progress)) {
             return true;
         }
-        if (MyDigest.handleIntent(this, intent) || MyReminders.handleIntent(this, intent)) {
+        if (MyReminders.handleIntent(this, intent)) {
             return true;
         }
         if (UserSelectorBottomSheet.handleIntent(intent, progress)) {

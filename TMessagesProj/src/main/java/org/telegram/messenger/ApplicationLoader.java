@@ -336,7 +336,6 @@ public class ApplicationLoader extends Application {
         super.onCreate();
         org.telegram.ui.MySettings.applyForcedPrefs(applicationContext);
         MyFonts.apply(applicationContext);
-        org.telegram.ui.MyDigest.schedule(applicationContext);
         org.telegram.ui.MyReminders.scheduleAll(applicationContext);
 
         // AndroidUtilities must be initialized before FileLog
