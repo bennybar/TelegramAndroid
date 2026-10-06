@@ -148,6 +148,7 @@ public class MySettings {
     private static final int ID_DIM_MUTED = 241;
     private static final int ID_TIME_GAPS = 242;
     private static final int ID_RESTART = 243;
+    private static final int ID_OPENAI_KEY = 244;
     private static final int ID_CLUTTER_BASE = 230; // 230..235, one per MyChatTweaks.CLUTTER_KEYS
     private static final String[][] CLUTTER_ROWS = {
         {"Star reactions", "The ⭐ paid reaction in reaction bars and under posts."},
@@ -281,6 +282,10 @@ public class MySettings {
         items.add(next++, UItem.asShadow("Reopen Tegram after changing any of these."));
         items.add(next++, UItem.asButton(ID_RESTART, "Restart Tegram now"));
         items.add(next, UItem.asShadow(null));
+        String openAiKey = AiSummarizer.prefs().getString("apiKey", "");
+        items.add(UItem.asHeader("AI"));
+        items.add(UItem.asSettingsCell(ID_OPENAI_KEY, "OpenAI API key", openAiKey.length() > 8 ? "…" + openAiKey.substring(openAiKey.length() - 4) : "Not set"));
+        items.add(UItem.asShadow("Used by the Digest tab, Ask AI and catch-up, with gpt-5.4-mini. Stored only on this phone and never included in backups."));
         items.add(UItem.asHeader("Google push"));
         String relay = MyFcmDistributor.relayUrl();
         items.add(UItem.asSettingsCell(ID_GOOGLE_PUSH_RELAY, "Google push relay", relay.isEmpty() ? "Not set" : Uri.parse(relay).getHost()));
@@ -339,6 +344,10 @@ public class MySettings {
             MyChatTweaks.toggle(MyChatTweaks.CLUTTER_KEYS[item.id - ID_CLUTTER_BASE]);
             refresh.run();
             restartBulletin(fragment, "Reopen Tegram to apply everywhere.");
+            return true;
+        }
+        if (item.id == ID_OPENAI_KEY) {
+            AiSummaryActivity.askKey(fragment.getParentActivity(), refresh);
             return true;
         }
         if (item.id == ID_RESTART) {

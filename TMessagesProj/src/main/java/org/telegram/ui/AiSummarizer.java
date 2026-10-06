@@ -33,7 +33,7 @@ import java.util.Locale;
 // History is loaded with the same messages.getHistory requests as scrolling a chat, paced to one per second.
 public class AiSummarizer {
 
-    public static final String DEFAULT_MODEL = "gpt-5.4-mini"; // same default as Scoops
+    public static final String MODEL = "gpt-5.4-mini"; // fixed, same as Scoops
     public static final int MAX_UNREAD_CHATS = 30;
     private static final int MAX_MESSAGES_PER_CHAT = 1500;
     private static final int PAGE_SIZE = 100;
@@ -214,7 +214,7 @@ public class AiSummarizer {
     // One prompt, one answer, off the UI thread (MyAiChat's Explain / Summarize / Translate).
     public static void askOnce(String system, String user, Utilities.Callback<String> onDone, Utilities.Callback<String> onError) {
         String key = prefs().getString("apiKey", "");
-        String model = prefs().getString("model", DEFAULT_MODEL);
+        String model = MODEL;
         Utilities.globalQueue.postRunnable(() -> {
             try {
                 String answer = complete(key, model, system, user);
@@ -368,7 +368,7 @@ public class AiSummarizer {
     // Second step, after the user confirms: split into chunks, summarize each, then merge.
     public void send() {
         String key = prefs().getString("apiKey", "");
-        String model = prefs().getString("model", DEFAULT_MODEL);
+        String model = MODEL;
         if (digestWindow != null) {
             String transcript = digestTranscript();
             String system = String.format(Locale.US, DIGEST_PROMPT, digestWindow);

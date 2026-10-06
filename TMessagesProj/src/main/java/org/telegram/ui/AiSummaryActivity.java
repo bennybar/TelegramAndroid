@@ -1,6 +1,5 @@
 package org.telegram.ui;
 
-import android.app.TimePickerDialog;
 import android.content.Context;
 import android.graphics.Typeface;
 import android.os.Bundle;
@@ -22,10 +21,12 @@ import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.DialogObject;
+import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.R;
 import org.telegram.messenger.Utilities;
 import org.telegram.messenger.forkgram.ForkDialogs;
 import org.telegram.tgnet.ConnectionsManager;
+import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
@@ -36,6 +37,7 @@ import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.UItem;
 import org.telegram.ui.Components.UniversalAdapter;
 import org.telegram.ui.Components.UniversalRecyclerView;
+import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 
 import java.util.ArrayList;
 import java.util.regex.Matcher;
@@ -51,37 +53,9 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
     private static final int ID_CHOOSE = 2;
     private static final int ID_CHAT = 10;
     private static final int ID_SUMMARIZE = 3;
-    private static final int ID_LAST = 4;
     private static final int ID_KEY = 5;
-    private static final int ID_MODEL = 6;
-    private static final int ID_DIGEST = 7;
-    private static final int ID_DIGEST_TIME = 8;
-    private static final int ID_DIGEST_NOW = 9;
 
     // Last result (from the tab or the morning digest), saved so reopening costs nothing.
-    public static void saveLast(String title, String summary, ArrayList<AiSummarizer.Ref> refs) {
-        StringBuilder refText = new StringBuilder();
-        for (AiSummarizer.Ref ref : refs) {
-            refText.append(ref.dialogId).append(':').append(ref.messageId).append(',');
-        }
-        AiSummarizer.prefs().edit().putString("lastTitle", title).putString("lastSummary", summary).putString("lastRefs", refText.toString()).apply();
-    }
-
-    public static BaseFragment lastResultFragment() {
-        String summary = AiSummarizer.prefs().getString("lastSummary", null);
-        if (summary == null) {
-            return null;
-        }
-        ArrayList<AiSummarizer.Ref> refs = new ArrayList<>();
-        for (String ref : AiSummarizer.prefs().getString("lastRefs", "").split(",")) {
-            int colon = ref.indexOf(':');
-            if (colon > 0) {
-                refs.add(new AiSummarizer.Ref(Long.parseLong(ref.substring(0, colon)), Integer.parseInt(ref.substring(colon + 1))));
-            }
-        }
-        return new ResultActivity(AiSummarizer.prefs().getString("lastTitle", ""), summary, refs);
-    }
-
     // The chats kept in this tab's list (the Digest and the morning digest both use them).
     public static ArrayList<Long> chatsForSummary(int account, int since) {
         ArrayList<Long> chats = new ArrayList<>();
@@ -180,26 +154,13 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         items.add(UItem.asButton(ID_CHOOSE, pickedChats.isEmpty() ? "Choose chats" : "Edit list").accent());
         items.add(UItem.asShadow("The digest reads these every time; the list is kept until you change it. Secret chats are never sent."));
 
-        items.add(UItem.asButton(ID_SUMMARIZE, "Summarize").accent());
-        if (AiSummarizer.prefs().contains("lastSummary")) {
-            items.add(UItem.asButton(ID_LAST, "Last digest", AiSummarizer.prefs().getString("lastTitle", "")));
+        if (AiSummarizer.prefs().getString("apiKey", "").isEmpty()) {
+            items.add(UItem.asButton(ID_KEY, "Set OpenAI API key").accent());
+            items.add(UItem.asShadow("The digest uses your own OpenAI key. It's stored only on this phone; change it later in Tegram's settings."));
+        } else {
+            items.add(UItem.asButton(ID_SUMMARIZE, "Summarize").accent());
+            items.add(UItem.asShadow(null));
         }
-        items.add(UItem.asShadow(null));
-
-        items.add(UItem.asHeader("Morning digest"));
-        items.add(UItem.asButtonCheck(ID_DIGEST, "Morning digest", "Every day, summarize the last 12 hours of the chats above into one notification.")
-            .setChecked(MyDigest.enabled()).setMultiline(true));
-        if (MyDigest.enabled()) {
-            items.add(UItem.asButton(ID_DIGEST_TIME, "Time", MyDigest.timeText()));
-            items.add(UItem.asButton(ID_DIGEST_NOW, "Send now"));
-        }
-        items.add(UItem.asShadow("Android may deliver it a few minutes late while the phone is asleep."));
-
-        String key = AiSummarizer.prefs().getString("apiKey", "");
-        items.add(UItem.asHeader("OpenAI"));
-        items.add(UItem.asButton(ID_KEY, "API key", key.length() > 8 ? "…" + key.substring(key.length() - 4) : "Not set"));
-        items.add(UItem.asButton(ID_MODEL, "Model", AiSummarizer.prefs().getString("model", AiSummarizer.DEFAULT_MODEL)));
-        items.add(UItem.asShadow("Your key is stored only on this phone and is never included in settings export."));
     }
 
     private void onClick(UItem item, View view, int position, float x, float y) {
@@ -219,42 +180,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
             showDialog(sheet);
             listView.adapter.update(true);
         } else if (item.id == ID_KEY) {
-            ForkDialogs.createFieldAlert(getParentActivity(), "OpenAI API key", AiSummarizer.prefs().getString("apiKey", ""), result -> {
-                AiSummarizer.prefs().edit().putString("apiKey", result.trim()).apply();
-                listView.adapter.update(true);
-                return null;
-            });
-        } else if (item.id == ID_MODEL) {
-            ForkDialogs.createFieldAlert(getParentActivity(), "Model", AiSummarizer.prefs().getString("model", AiSummarizer.DEFAULT_MODEL), result -> {
-                String model = result.trim();
-                AiSummarizer.prefs().edit().putString("model", model.isEmpty() ? AiSummarizer.DEFAULT_MODEL : model).apply();
-                listView.adapter.update(true);
-                return null;
-            });
-        } else if (item.id == ID_LAST) {
-            BaseFragment last = lastResultFragment();
-            if (last != null) {
-                presentFragment(last);
-            }
-        } else if (item.id == ID_DIGEST) {
-            MyDigest.setEnabled(!MyDigest.enabled());
-            listView.adapter.update(true);
-        } else if (item.id == ID_DIGEST_TIME) {
-            new TimePickerDialog(getParentActivity(), (picker, hour, minute) -> {
-                MyDigest.setMinuteOfDay(hour * 60 + minute);
-                listView.adapter.update(true);
-            }, MyDigest.minuteOfDay() / 60, MyDigest.minuteOfDay() % 60, true).show();
-        } else if (item.id == ID_DIGEST_NOW) {
-            if (AiSummarizer.prefs().getString("apiKey", "").isEmpty()) {
-                BulletinFactory.of(this).createErrorBulletin("Set your OpenAI API key first.").show();
-                return;
-            }
-            BulletinFactory.of(this).createSimpleBulletin(R.raw.contacts_sync_on, "Preparing digest… it arrives as a notification.").show();
-            MyDigest.run(() -> {
-                if (listView != null) {
-                    listView.adapter.update(true);
-                }
-            });
+            askKey(getParentActivity(), () -> listView.adapter.update(true));
         } else if (item.id == ID_SUMMARIZE) {
             startSummary();
         }
@@ -306,12 +232,9 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
             @Override
             public void onDone(String summary) {
                 dismissProgress();
-                saveLast(title, summary, running == null ? new ArrayList<>() : running.refs);
+                ArrayList<AiSummarizer.Ref> refs = running == null ? new ArrayList<>() : running.refs;
                 running = null;
-                if (listView != null) {
-                    listView.adapter.update(true);
-                }
-                presentFragment(lastResultFragment());
+                presentFragment(new ResultActivity(title, summary, refs));
             }
 
             @Override
@@ -343,6 +266,17 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
             running = null;
         }
         super.onFragmentDestroy();
+    }
+
+    // Also used by Tegram's settings (MySettings), where the key can be changed once set.
+    public static void askKey(Context context, Runnable done) {
+        ForkDialogs.createFieldAlert(context, "OpenAI API key", AiSummarizer.prefs().getString("apiKey", ""), result -> {
+            AiSummarizer.prefs().edit().putString("apiKey", result.trim()).apply();
+            if (done != null) {
+                done.run();
+            }
+            return null;
+        });
     }
 
     private static final Pattern REF = Pattern.compile("\\s*\\[r(\\d+)\\]");
@@ -484,9 +418,47 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
                 }
             });
 
-            fragmentView = summaryView(context, summary, refs, ref -> openMessage(this, ref));
-            fragmentView.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+            FrameLayout frame = new FrameLayout(context);
+            frame.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+            ScrollView scroll = summaryView(context, summary, refs, ref -> openMessage(this, ref));
+            scroll.setClipToPadding(false);
+            scroll.setPadding(0, 0, 0, AndroidUtilities.dp(16 + 48 + 16));
+            frame.addView(scroll, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+
+            ButtonWithCounterView markRead = new ButtonWithCounterView(context, null);
+            markRead.setText("Mark as read", false);
+            markRead.setOnClickListener(v -> {
+                int chats = markDigestedAsRead();
+                markRead.setEnabled(false);
+                markRead.setText(chats == 0 ? "Nothing to mark" : "Marked as read", true);
+            });
+            frame.addView(markRead, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 48, Gravity.BOTTOM, 16, 0, 16, 16));
+            fragmentView = frame;
             return fragmentView;
+        }
+
+        // Each chat in the digest is marked read up to the newest message the digest read, so anything that
+        // arrived since stays unread.
+        private int markDigestedAsRead() {
+            MessagesController controller = getMessagesController();
+            android.util.LongSparseArray<Integer> newest = new android.util.LongSparseArray<>();
+            for (AiSummarizer.Ref ref : refs) {
+                Integer known = newest.get(ref.dialogId);
+                if (known == null || ref.messageId > known) {
+                    newest.put(ref.dialogId, ref.messageId);
+                }
+            }
+            int now = getConnectionsManager().getCurrentTime();
+            for (int i = 0; i < newest.size(); i++) {
+                long did = newest.keyAt(i);
+                int maxId = newest.valueAt(i);
+                TLRPC.Dialog dialog = controller.dialogs_dict.get(did);
+                if (dialog != null && maxId >= dialog.top_message) {
+                    controller.markMentionsAsRead(did, 0);
+                }
+                controller.markDialogAsRead(did, maxId, maxId, now, false, 0, 0, true, 0);
+            }
+            return newest.size();
         }
     }
 }
