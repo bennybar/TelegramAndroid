@@ -67,8 +67,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 // "Digest" bottom tab (after Scoops' digest): a Hebrew news summary of the chats and channels kept in the list,
-// over a window of 5 minutes to 8 hours, with the user's own OpenAI key. "Since last digest" starts each chat
-// after the newest post the previous digest included. The last digest is kept and can be reopened for free.
+// over a window of 5 minutes to 8 hours, with the user's own OpenAI key: everything posted in that time, or with
+// "Since last digest" (off by default) only what's newer than the previous digest. The last digest is kept and
+// can be reopened for free.
 public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.TabFragmentDelegate {
 
     // The time window stops, in minutes: 5 minutes to 8 hours.
@@ -91,7 +92,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
     }
 
     private static boolean sinceLast() {
-        return AiSummarizer.prefs().getBoolean("digestSinceLast", true);
+        return AiSummarizer.prefs().getBoolean("digestSinceLast", false);
     }
 
     // Per chat, the newest message the last digest included ("did:id,did:id").
@@ -306,10 +307,13 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
             estimateView.setText("Add chats or channels below");
             estimateView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
         } else if (chats == 0) {
-            estimateView.setText("Nothing new in this time");
+            estimateView.setText(sinceLast() ? "Nothing new since the last digest" : "No posts in this time");
             estimateView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
-        } else {
+        } else if (sinceLast()) {
             estimateView.setText("≈ " + total + " new posts in " + chats + " of " + pickedChats.size() + (pickedChats.size() == 1 ? " chat" : " chats"));
+            estimateView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
+        } else {
+            estimateView.setText(chats + " of " + pickedChats.size() + (pickedChats.size() == 1 ? " chat" : " chats") + " posted in this time");
             estimateView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
         }
     }
@@ -397,7 +401,15 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         int n = estimateNew(did, windowStart);
         TextView sub = new TextView(context);
         String lastText = dialog == null || dialog.last_message_date == 0 ? "" : " · last " + LocaleController.stringForMessageListDate(dialog.last_message_date);
-        sub.setText((n == 0 ? "Nothing new" : n + " new") + lastText);
+        String count;
+        if (n == 0) {
+            count = sinceLast() ? "Nothing new" : "No posts in this time";
+        } else if (sinceLast()) {
+            count = n + " new";
+        } else {
+            count = dialog != null && dialog.unread_count > 0 ? dialog.unread_count + " unread" : "Posted in this time";
+        }
+        sub.setText(count + lastText);
         sub.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
         sub.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
         sub.setSingleLine(true);
@@ -505,7 +517,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         }
         updateEstimate();
         items.add(UItem.asCustom(windowCard));
-        items.add(UItem.asButtonCheck(ID_SINCE_LAST, "Since last digest", "Each chat starts after the newest post your previous digest included.")
+        items.add(UItem.asButtonCheck(ID_SINCE_LAST, "Only since last digest", "Off: everything posted in the chosen time. On: each chat starts after the newest post your previous digest included.")
             .setChecked(sinceLast()).setMultiline(true));
         items.add(UItem.asShadow(null));
 
