@@ -92,6 +92,9 @@ public class MyVoiceNotes {
     }
 
     public static void setNames(String value) {
+        if (!value.trim().equals(names())) {
+            cache().edit().clear().apply(); // redo saved notes with the new names
+        }
         AiSummarizer.prefs().edit().putString("voiceNames", value.trim()).apply();
     }
 
@@ -501,6 +504,10 @@ public class MyVoiceNotes {
             try (DataOutputStream out = new DataOutputStream(connection.getOutputStream())) {
                 writeField(out, boundary, "model", TRANSCRIBE_MODEL);
                 writeField(out, boundary, "language", "he");
+                if (!names().isEmpty()) {
+                    // A spelling hint for the transcription itself (the bot only fixes names in the summary).
+                    writeField(out, boundary, "prompt", "שמות שעשויים להופיע בהקלטה: " + names().replaceAll("\\s*,\\s*", ", ") + ".");
+                }
                 out.write(("--" + boundary + "\r\nContent-Disposition: form-data; name=\"file\"; filename=\"" + fileName + "\"\r\n" +
                     "Content-Type: application/octet-stream\r\n\r\n").getBytes(StandardCharsets.UTF_8));
                 try (InputStream in = new FileInputStream(file)) {
