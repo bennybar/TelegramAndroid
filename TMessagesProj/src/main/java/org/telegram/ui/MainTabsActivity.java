@@ -631,6 +631,14 @@ public class MainTabsActivity extends ViewPagerActivity implements NotificationC
         }
     }
 
+    // Digest result (AiSummaryActivity) after Mark as read: back to the chat list.
+    public void myShowChats() {
+        if (viewPager != null) {
+            viewPager.scrollToPosition(POSITION_CHATS);
+            selectTab(POSITION_CHATS, true);
+        }
+    }
+
     private void openFolder(int folderId) {
         if (viewPager.getCurrentPosition() == POSITION_CHATS && dialogsActivity != null) {
             dialogsActivity.scrollToFolder(folderId);
