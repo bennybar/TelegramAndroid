@@ -63,10 +63,20 @@ public class AiSummarizer {
         "Format it as Markdown. Group related messages into topics, at most six. Give each topic a `## ` heading, " +
         "then `-` bullets, one per distinct development, newest first. Start every bullet with its posting time " +
         "exactly as given in the input (\"HH:MM\", or \"אתמול HH:MM\" for yesterday). Use `**bold**` for the key " +
-        "fact of each bullet. Merge messages that report the same thing, even from different chats. End every bullet " +
-        "with 1 or 2 references copied from the input, like [r12]; only use references that appear in the input. " +
-        "Skip small talk, ads and promotions. Do not use tables, code blocks or other headings. Keep the whole " +
+        "fact of each bullet. End every bullet with 1 to 3 references copied from the input, like [r12] [r40]; only " +
+        "use references that appear in the input. Do not use tables, code blocks or other headings. Keep the whole " +
         "digest under 450 words.\n" +
+        "Deduplicate strictly. News channels repost, forward and rephrase the same report many times, so:\n" +
+        "1. Every development appears exactly once in the whole digest: never twice in one topic, never in two topics.\n" +
+        "2. Messages about the same event (same incident, statement, number or announcement, even worded differently, " +
+        "in different languages, or from different chats) become ONE bullet. Use the earliest time it was reported, " +
+        "combine the details, and cite up to 3 of the messages, preferably from different chats.\n" +
+        "3. When later messages update the same story (new numbers, a confirmation, a denial), write one bullet with " +
+        "the latest state and mention what changed; do not list each update separately.\n" +
+        "4. Do not restate a known story as if it were new.\n" +
+        "Ignore messages with no news content: pictures or videos without informative text, emoji-only or " +
+        "reaction posts, bare links, \"follow us\"/join/subscribe calls, ads, promotions and small talk. Never write " +
+        "a bullet that only says a photo or video was posted.\n" +
         "Do not invent details that are not in the messages. Many are unverified first reports: describe them as " +
         "reports, and say so plainly when messages contradict each other.";
 
@@ -77,8 +87,10 @@ public class AiSummarizer {
 
     private static final String DIGEST_MERGE_PROMPT =
         "You are given several partial news digests of the same Telegram chats over the last %s, each covering a " +
-        "different stretch of time. Merge them into one digest: combine topics that are about the same story, keep " +
-        "every bullet's time and [r..] references, and drop exact repeats.\n" + DIGEST_RULES;
+        "different stretch of time, so the same story often appears in more than one part. Merge them into one " +
+        "digest: combine topics that are about the same story, merge bullets about the same event into one (earliest " +
+        "time, latest state, up to 3 of their [r..] references), and keep every other bullet's time and references.\n" +
+        DIGEST_RULES;
 
     // At most this many posts per digest (about 8 busy hours of a few channels), shared across the chats, and at
     // most 3 slices of SLICE_CHARS each: every slice is summarized, then the parts are merged.
@@ -163,15 +175,15 @@ public class AiSummarizer {
         final String ref;
         final String body;
         final long groupId;
-        final boolean mediaOnly;
+        final boolean empty; // no words worth summarizing
 
-        Entry(int date, String chat, String ref, String body, long groupId, boolean mediaOnly) {
+        Entry(int date, String chat, String ref, String body, long groupId, boolean empty) {
             this.date = date;
             this.chat = chat;
             this.ref = ref;
             this.body = body;
             this.groupId = groupId;
-            this.mediaOnly = mediaOnly;
+            this.empty = empty;
         }
     }
 
@@ -197,6 +209,12 @@ public class AiSummarizer {
         return digestWindow == null ? MAX_MESSAGES_PER_CHAT : Math.max(20, (DIGEST_MAX_POSTS + dialogIds.size() - 1) / dialogIds.size());
     }
 
+    // At least two words of letters once links are removed: something a digest could say.
+    private static boolean hasWords(String text) {
+        String words = text.replaceAll("https?://\\S+|t\\.me/\\S+|@\\w+", " ").replaceAll("[^\\p{L}]+", " ").trim();
+        return words.contains(" ") || words.length() >= 6;
+    }
+
     // "08:54", or "אתמול 23:40" for a post from before midnight.
     private static String digestTime(int date) {
         Calendar now = Calendar.getInstance();
@@ -207,7 +225,7 @@ public class AiSummarizer {
         return today ? clock : "אתמול " + clock;
     }
 
-    // Newest first, without exact repeats (forwards), caption-less media or extra album items; the budget is
+    // Newest first, without exact repeats (forwards), posts without words (bare media, emoji, links) or extra album items; the budget is
     // shared evenly over what's left and packed into at most MAX_SLICES slices.
     private ArrayList<String> digestSlices() {
         ArrayList<Entry> sorted = new ArrayList<>(entries);
@@ -216,7 +234,7 @@ public class AiSummarizer {
         java.util.HashSet<Long> seenGroups = new java.util.HashSet<>();
         ArrayList<Entry> kept = new ArrayList<>();
         for (Entry entry : sorted) {
-            if (entry.mediaOnly || entry.groupId != 0 && !seenGroups.add(entry.groupId) || !seenBodies.add(entry.body)) {
+            if (entry.empty || entry.groupId != 0 && !seenGroups.add(entry.groupId) || !seenBodies.add(entry.body)) {
                 continue;
             }
             kept.add(entry);
@@ -396,8 +414,11 @@ public class AiSummarizer {
         Ref ref = new Ref(did, message.id);
         ref.out = message.out;
         refs.add(ref);
-        entries.add(new Entry(message.date, chatTitle(account, did), "[r" + refs.size() + "]", body.replace('\n', ' '),
-            message.grouped_id, media != null && (message.message == null || message.message.trim().isEmpty())));
+        // The digest gets the post's own text only: a "[photo]" marker carries no news, and posts without real
+        // words (no caption, emoji only, a bare link) are dropped before the budget.
+        String digestText = message.message == null ? "" : message.message.trim().replace('\n', ' ');
+        entries.add(new Entry(message.date, chatTitle(account, did), "[r" + refs.size() + "]", digestText,
+            message.grouped_id, !hasWords(digestText)));
         String time = new SimpleDateFormat("EEE HH:mm", Locale.US).format(new Date(message.date * 1000L));
         return "[r" + refs.size() + "] " + time + " " + senderName(message) + (message.mentioned ? " (mentions Me)" : "") + ": " + body.replace('\n', ' ');
     }
