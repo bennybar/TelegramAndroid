@@ -3,6 +3,15 @@ package org.telegram.ui;
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.graphics.Canvas;
+import android.graphics.LinearGradient;
+import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.PorterDuffColorFilter;
+import android.graphics.Rect;
+import android.graphics.RectF;
+import android.graphics.Shader;
+import android.graphics.drawable.Drawable;
 import android.graphics.Typeface;
 import android.media.MediaPlayer;
 import android.text.SpannableStringBuilder;
@@ -55,7 +64,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
-// "Transcribe & summarize" on voice notes and video messages, mirroring the owner's voice bot (tgbot) step by step:
+// The transcribe button (→A) on voice notes and video messages runs "Transcribe & summarize", mirroring the owner's voice bot (tgbot) step by step:
 // gpt-4o-transcribe in Hebrew (3 tries with backoff); recordings over 2 minutes split at silences into ~90 s chunks
 // transcribed 4 at a time and stitched with boundary overlap removed, a failed chunk marked "[…קטע לא תומלל…]";
 // an empty transcript retried once on a loudness-normalized copy; then the bot's JSON prompt (tone + sections,
@@ -66,7 +75,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 // message (locally). Secret chats are never sent; the OpenAI key is the Digest's.
 public class MyVoiceNotes {
 
-    public static final int OPTION_VOICE = 1002;
     private static final String TRANSCRIBE_MODEL = "gpt-4o-transcribe";
     private static final String MODEL = "gpt-6.1-sol";
     private static final String TTS_MODEL = "gpt-4o-mini-tts";
@@ -91,38 +99,70 @@ public class MyVoiceNotes {
         return message != null && message.getDocument() != null && (message.isVoice() || message.isRoundVideo());
     }
 
-    // fillMessageMenu hook: above Delete, for voice notes and video messages outside secret chats.
-    public static void addMenuItem(MessageObject message, long dialogId, ArrayList<Integer> icons, ArrayList<CharSequence> items, ArrayList<Integer> options) {
-        if (!isVoice(message) || DialogObject.isEncryptedDialog(dialogId)) {
-            return;
-        }
-        int index = options.indexOf(ChatActivity.OPTION_DELETE);
-        if (index < 0) {
-            index = options.size();
-        }
-        items.add(index, "Transcribe & summarize");
-        options.add(index, OPTION_VOICE);
-        icons.add(index, R.drawable.summary_stars);
+    private static boolean hasKey() {
+        return !AiSummarizer.prefs().getString("apiKey", "").isEmpty();
     }
 
-    // processSelectedOption hook.
-    public static boolean handleOption(ChatActivity chat, int option, MessageObject message) {
-        if (option != OPTION_VOICE || !isVoice(message)) {
+    // ChatMessageCell hook: show the transcribe button on voice notes and video messages (outside secret chats)
+    // once there's an OpenAI key, Premium or not.
+    public static boolean useButton(MessageObject message) {
+        return hasKey() && isVoice(message) && !DialogObject.isEncryptedDialog(message.getDialogId());
+    }
+
+    // TranscribeButton hook: a tap on the closed button runs Transcribe & summarize instead of Telegram's
+    // transcription (or its Premium offer). Tapping the open button still collapses the transcript.
+    public static boolean onButtonTap(MessageObject message) {
+        if (!useButton(message)) {
             return false;
         }
+        org.telegram.ui.ActionBar.BaseFragment fragment = LaunchActivity.getSafeLastFragment();
+        if (!(fragment instanceof ChatActivity)) {
+            return false;
+        }
+        start((ChatActivity) fragment, message);
+        return true;
+    }
+
+    private static Paint buttonPaint;
+    private static Drawable sparkle;
+    private static final RectF buttonRect = new RectF();
+
+    // TranscribeButton hook: the closed button as an accent gradient pill with a white sparkle.
+    public static boolean drawButton(Canvas canvas, Rect bounds, int radius, float alpha, MessageObject message) {
+        if (!useButton(message) || bounds.width() <= 0) {
+            return false;
+        }
+        int accent = Theme.getColor(Theme.key_featuredStickers_addButton);
+        int second = Theme.blendOver(accent, Theme.multAlpha(0xFF9B5CF6, 0.55f));
+        if (buttonPaint == null) {
+            buttonPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        }
+        buttonPaint.setShader(new LinearGradient(bounds.left, bounds.top, bounds.right, bounds.bottom, accent, second, Shader.TileMode.CLAMP));
+        buttonPaint.setAlpha((int) (255 * alpha));
+        buttonRect.set(bounds);
+        canvas.drawRoundRect(buttonRect, radius, radius, buttonPaint);
+        if (sparkle == null) {
+            sparkle = ApplicationLoader.applicationContext.getResources().getDrawable(R.drawable.summary_stars).mutate();
+            sparkle.setColorFilter(new PorterDuffColorFilter(0xFFFFFFFF, PorterDuff.Mode.SRC_IN));
+        }
+        int size = Math.min(AndroidUtilities.dp(20), Math.min(bounds.width(), bounds.height()) - AndroidUtilities.dp(6));
+        sparkle.setBounds(bounds.centerX() - size / 2, bounds.centerY() - size / 2, bounds.centerX() + size / 2, bounds.centerY() + size / 2);
+        sparkle.setAlpha((int) (255 * alpha));
+        sparkle.draw(canvas);
+        return true;
+    }
+
+    // From the transcribe button on a voice note or video message.
+    private static void start(ChatActivity chat, MessageObject message) {
         Activity activity = chat.getParentActivity();
         if (activity == null) {
-            return true;
+            return;
         }
         Note cached = Note.load(cacheKey(message));
         if (cached != null) {
             applyTranscript(message, cached.transcript);
             showNote(chat, message, cached);
-            return true;
-        }
-        if (AiSummarizer.prefs().getString("apiKey", "").isEmpty()) {
-            BulletinFactory.of(chat).createErrorBulletin("Set your OpenAI API key in Tegram's settings (AI) first.").show();
-            return true;
+            return;
         }
         AlertDialog progress = new AlertDialog(activity, AlertDialog.ALERT_TYPE_SPINNER);
         progress.setCanCancel(true);
@@ -131,7 +171,6 @@ public class MyVoiceNotes {
         progress.setOnCancelListener(d -> cancelled[0] = true);
         progress.show();
         withFile(chat, message, progress, cancelled, file -> Utilities.globalQueue.postRunnable(() -> process(chat, message, file, progress, cancelled)));
-        return true;
     }
 
     // The voice file id is the same for every forward of the note, like the bot's file_unique_id.
