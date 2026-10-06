@@ -55,7 +55,6 @@ import org.telegram.ui.Components.SeekBarView;
 import org.telegram.ui.Components.UItem;
 import org.telegram.ui.Components.UniversalAdapter;
 import org.telegram.ui.Components.UniversalRecyclerView;
-import org.telegram.ui.Stories.recorder.ButtonWithCounterView;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -581,11 +580,26 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         return intro;
     }
 
+    // A filled button as a plain TextView: text centered by gravity without font padding, so it stays centered
+    // with any font (Telegram's animated button places text from font metrics, which drift with Google Sans).
+    static TextView primaryButton(Context context, String text) {
+        TextView button = new TextView(context);
+        button.setText(text);
+        button.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
+        button.setTypeface(AndroidUtilities.bold());
+        button.setTextColor(Theme.getColor(Theme.key_featuredStickers_buttonText));
+        button.setGravity(Gravity.CENTER);
+        button.setIncludeFontPadding(false);
+        button.setSingleLine(true);
+        int color = Theme.getColor(Theme.key_featuredStickers_addButton);
+        button.setBackground(Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(10), color, Theme.blendOver(color, Theme.multAlpha(0xFFFFFFFF, 0.15f))));
+        return button;
+    }
+
     private View createSummarizeButton(Context context) {
         FrameLayout frame = new FrameLayout(context);
         frame.setPadding(AndroidUtilities.dp(16), AndroidUtilities.dp(14), AndroidUtilities.dp(16), AndroidUtilities.dp(14));
-        ButtonWithCounterView button = new ButtonWithCounterView(context, null);
-        button.setText("✦  Summarize", false);
+        TextView button = primaryButton(context, "✦  Summarize");
         button.setEnabled(!pickedChats.isEmpty());
         button.setAlpha(pickedChats.isEmpty() ? 0.5f : 1f);
         button.setOnClickListener(v -> startSummary());
@@ -1033,15 +1047,14 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
             disclaimer.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
             column.addView(disclaimer, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 18, 0, 18, 8));
 
-            markRead = new ButtonWithCounterView(context, null);
-            markRead.setText("Mark " + chats + (chats == 1 ? " chat" : " chats") + " as read", false);
+            markRead = primaryButton(context, "Mark " + chats + (chats == 1 ? " chat" : " chats") + " as read");
             markRead.setOnClickListener(v -> confirmMarkRead());
             column.addView(markRead, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 46, 16, 8, 16, 16));
             fragmentView = frame;
             return fragmentView;
         }
 
-        private ButtonWithCounterView markRead;
+        private TextView markRead;
         private boolean marked;
 
         // From the button at the end of the digest or the ✓✓ icon in the top bar.
@@ -1054,7 +1067,8 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
                 marked = true;
                 if (markRead != null) {
                     markRead.setEnabled(false);
-                    markRead.setText(chats == 0 ? "Nothing to mark" : "✓ Marked as read", true);
+                    markRead.setAlpha(0.6f);
+                    markRead.setText(chats == 0 ? "Nothing to mark" : "✓ Marked as read");
                 }
                 BulletinFactory.of(this).createSimpleBulletin(R.raw.contacts_sync_on, chats == 0 ? "Nothing to mark." : "Marked " + chats + (chats == 1 ? " chat" : " chats") + " as read.").show();
             };
