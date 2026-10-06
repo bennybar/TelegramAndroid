@@ -88,6 +88,7 @@ public class AiSummarizer {
     public static class Ref {
         public final long dialogId;
         public final int messageId;
+        public boolean out; // sent by the user: never counted as unread
 
         public Ref(long dialogId, int messageId) {
             this.dialogId = dialogId;
@@ -266,6 +267,13 @@ public class AiSummarizer {
             if (cancelled) {
                 return;
             }
+            if (error != null && error.text != null && error.text.startsWith("FLOOD_WAIT")) {
+                // Telegram asked to slow down: stop the whole run instead of sending more requests.
+                cancelled = true;
+                String wait = error.text.substring("FLOOD_WAIT".length()).replace("_", "");
+                callback.onError("Telegram asked to slow down. Try again in " + (wait.isEmpty() ? "a few" : wait) + " seconds.");
+                return;
+            }
             if (error != null || !(response instanceof TLRPC.messages_Messages)) {
                 // Skip a chat that fails to load instead of failing the whole run.
                 AndroidUtilities.runOnUIThread(() -> loadPage(chatIndex + 1, 0), REQUEST_INTERVAL_MS);
@@ -332,7 +340,9 @@ public class AiSummarizer {
         if (body.isEmpty()) {
             return null;
         }
-        refs.add(new Ref(did, message.id));
+        Ref ref = new Ref(did, message.id);
+        ref.out = message.out;
+        refs.add(ref);
         entries.add(new Entry(message.date, chatTitle(account, did), "[r" + refs.size() + "]", body.replace('\n', ' ')));
         String time = new SimpleDateFormat("EEE HH:mm", Locale.US).format(new Date(message.date * 1000L));
         return "[r" + refs.size() + "] " + time + " " + senderName(message) + (message.mentioned ? " (mentions Me)" : "") + ": " + body.replace('\n', ' ');
