@@ -12669,6 +12669,8 @@ public class ChatMessageCell extends BaseCell implements SeekBar.SeekBarDelegate
             (
                 UserConfig.getInstance(currentAccount).isPremium()
                 ||
+                org.telegram.ui.MyVoiceNotes.useButton(currentMessageObject)
+                ||
                 org.telegram.messenger.CloudflareSTT.isConfigured()
                 ||
                 org.telegram.messenger.forkgram.ForkOfflineTranscribe.isActive()

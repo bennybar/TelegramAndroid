@@ -207,6 +207,10 @@ public class TranscribeButton {
         if (parent == null) {
             return;
         }
+        if (!shouldBeOpen && org.telegram.ui.MyVoiceNotes.onButtonTap(parent.getMessageObject())) {
+            pressed = false; // Tegram: transcribe & summarize with the user's OpenAI key (MyVoiceNotes)
+            return;
+        }
         clickedToOpen = false;
         if (!shouldBeOpen && loading && isOfflineTranscribing(parent.getMessageObject())) {
             setLoading(false, true);
@@ -324,6 +328,9 @@ public class TranscribeButton {
 
     public void draw(Canvas canvas, float alpha) {
         this.pressBounds.set(this.bounds.left - dp(8), this.bounds.top - dp(8), this.bounds.right + dp(8), this.bounds.bottom + dp(8));
+        if (!isOpen && !loading && org.telegram.ui.MyVoiceNotes.drawButton(canvas, bounds, radius, alpha, parent.getMessageObject())) {
+            return; // Tegram's own look for the closed button
+        }
         if (boundsPath == null) {
             boundsPath = new Path();
         } else {

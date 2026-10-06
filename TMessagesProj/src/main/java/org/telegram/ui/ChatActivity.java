@@ -34153,7 +34153,7 @@ public class ChatActivity extends BaseFragment implements
         if (selectedObject == null || getParentActivity() == null) {
             return;
         }
-        if (MyReminders.handleOption(this, option, selectedObject) || MyAiChat.handleOption(this, option, MyAiChat.textMessage(selectedObject, selectedObjectGroup)) || MyVoiceNotes.handleOption(this, option, selectedObject)) {
+        if (MyReminders.handleOption(this, option, selectedObject) || MyAiChat.handleOption(this, option, MyAiChat.textMessage(selectedObject, selectedObjectGroup))) {
             closeMenu();
             return;
         }
@@ -47114,7 +47114,6 @@ public class ChatActivity extends BaseFragment implements
         }
         MyReminders.addMenuItem(selectedObject, icons, items, options);
         MyAiChat.addMenuItem(MyAiChat.textMessage(selectedObject, selectedObjectGroup), dialog_id, icons, items, options);
-        MyVoiceNotes.addMenuItem(selectedObject, dialog_id, icons, items, options);
     }
 
     private boolean showWelcomeMessageRevertOption(MessageObject messageObject) {
