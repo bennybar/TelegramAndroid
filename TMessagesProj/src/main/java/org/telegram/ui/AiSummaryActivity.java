@@ -402,7 +402,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
     private static TextView sectionLabel(Context context, String text) {
         TextView label = new TextView(context);
         label.setText(text);
-        label.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
+        label.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 11);
         label.setLetterSpacing(0.04f);
         label.setTypeface(AndroidUtilities.bold());
         label.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
@@ -418,7 +418,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         card.addView(sectionLabel(context, "POSTED IN THE LAST"));
 
         TextView value = new TextView(context);
-        value.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 26);
+        value.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
         value.setTypeface(AndroidUtilities.bold());
         value.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
         value.setText(windowLabel(WINDOW_MINUTES[windowIndex()]));
@@ -449,7 +449,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         card.addView(slider, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 38, 0, -15, 0, -15, 0));
 
         estimateView = new TextView(context);
-        estimateView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        estimateView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
         estimateView.setTypeface(AndroidUtilities.bold());
         card.addView(estimateView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 2, 0, 0));
         return card;
@@ -462,22 +462,22 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         TLObject peer = did > 0 ? getMessagesController().getUser(did) : getMessagesController().getChat(-did);
 
         BackupImageView avatar = new BackupImageView(context);
-        avatar.setRoundRadius(AndroidUtilities.dp(20));
+        avatar.setRoundRadius(AndroidUtilities.dp(18));
         AvatarDrawable avatarDrawable = new AvatarDrawable();
         if (peer != null) {
             avatarDrawable.setInfo(currentAccount, peer);
             avatar.setForUserOrChat(peer, avatarDrawable);
         }
-        row.addView(avatar, LayoutHelper.createFrame(40, 40, Gravity.LEFT | Gravity.CENTER_VERTICAL, 18, 8, 0, 8));
+        row.addView(avatar, LayoutHelper.createFrame(36, 36, Gravity.LEFT | Gravity.CENTER_VERTICAL, 18, 8, 0, 8));
 
         TextView name = new TextView(context);
         name.setText(AiSummarizer.chatTitle(currentAccount, did));
-        name.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+        name.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
         name.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
         name.setSingleLine(true);
         name.setEllipsize(TextUtils.TruncateAt.END);
         name.setTextDirection(View.TEXT_DIRECTION_LTR);
-        row.addView(name, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 72, 9, 56, 0));
+        row.addView(name, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 68, 8, 56, 0));
 
         TLRPC.Dialog dialog = getMessagesController().dialogs_dict.get(did);
         Integer n = postsInWindow(did);
@@ -494,10 +494,10 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
             count = n + (n == 1 ? " post" : " posts") + (sinceLast() ? " new" : "");
         }
         sub.setText(count + lastText);
-        sub.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+        sub.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
         sub.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
         sub.setSingleLine(true);
-        row.addView(sub, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 72, 32, 56, 0));
+        row.addView(sub, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 68, 29, 56, 0));
 
         TextView remove = new TextView(context);
         remove.setText("✕");
@@ -513,7 +513,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
             updateEstimate();
         });
         row.addView(remove, LayoutHelper.createFrame(44, 44, Gravity.RIGHT | Gravity.CENTER_VERTICAL, 0, 0, 8, 0));
-        row.setMinimumHeight(AndroidUtilities.dp(56));
+        row.setMinimumHeight(AndroidUtilities.dp(52));
         return row;
     }
 
@@ -527,14 +527,14 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
 
         TextView meta = new TextView(context);
         meta.setText("Last " + windowLabel(digest.minutes) + " · " + whenText(digest.time));
-        meta.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
+        meta.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
         meta.setTypeface(AndroidUtilities.bold());
         meta.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
         card.addView(meta, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 4, 0, 4));
 
         TextView preview = new TextView(context);
         preview.setText(previewText(digest.text));
-        preview.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        preview.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
         preview.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
         preview.setMaxLines(2);
         preview.setEllipsize(TextUtils.TruncateAt.END);
@@ -543,7 +543,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
 
         TextView open = new TextView(context);
         open.setText("Open full digest ›");
-        open.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        open.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
         open.setTypeface(AndroidUtilities.bold());
         open.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
         card.addView(open, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 8, 0, 0));
@@ -575,7 +575,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
     private View createIntro(Context context) {
         TextView intro = new TextView(context);
         intro.setText("A Hebrew news summary of the chats and channels below, for the time you choose.");
-        intro.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+        intro.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
         intro.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
         intro.setPadding(AndroidUtilities.dp(21), AndroidUtilities.dp(14), AndroidUtilities.dp(21), AndroidUtilities.dp(10));
         return intro;
@@ -589,7 +589,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         button.setEnabled(!pickedChats.isEmpty());
         button.setAlpha(pickedChats.isEmpty() ? 0.5f : 1f);
         button.setOnClickListener(v -> startSummary());
-        frame.addView(button, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 50));
+        frame.addView(button, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 46));
         return frame;
     }
 
@@ -601,7 +601,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         }
         updateEstimate();
         items.add(UItem.asCustom(windowCard));
-        items.add(UItem.asButtonCheck(ID_SINCE_LAST, "Only since last digest", "Off: everything posted in the chosen time. On: each chat starts after the newest post your previous digest included.")
+        items.add(UItem.asButtonCheck(ID_SINCE_LAST, "Only since last digest", "Skip posts your previous digest already covered.")
             .setChecked(sinceLast()).setMultiline(true));
         items.add(UItem.asShadow(null));
 
@@ -792,7 +792,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
     // references as chat chips that open the source message. Paragraphs with Hebrew always read right-to-left.
     public static TextView summaryText(Context context, String summary, ArrayList<AiSummarizer.Ref> refs, Utilities.Callback<AiSummarizer.Ref> onRef) {
         TextView textView = new TextView(context);
-        textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+        textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
         textView.setLineSpacing(AndroidUtilities.dp(3), 1f);
         textView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
         textView.setLinkTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteLinkText));
@@ -971,6 +971,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
             actionBar.setBackButtonImage(R.drawable.ic_ab_back);
             actionBar.setTitle("Digest");
             String share = "Digest · last " + windowLabel(digest.minutes) + " · " + whenText(digest.time) + "\n\n" + plainText(digest.text);
+            actionBar.createMenu().addItem(3, R.drawable.msg_markread).setContentDescription("Mark as read");
             actionBar.createMenu().addItem(1, R.drawable.msg_copy);
             actionBar.createMenu().addItem(2, R.drawable.msg_share);
             actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
@@ -978,6 +979,8 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
                 public void onItemClick(int id) {
                     if (id == -1) {
                         finishFragment();
+                    } else if (id == 3) {
+                        confirmMarkRead();
                     } else if (id == 1) {
                         AndroidUtilities.addToClipboard(share);
                         BulletinFactory.of(ResultActivity.this).createCopyBulletin("Copied").show();
@@ -994,7 +997,8 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
             frame.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
             ScrollView scroll = new ScrollView(context);
             scroll.setClipToPadding(false);
-            scroll.setPadding(0, 0, 0, AndroidUtilities.dp(16 + 50 + 16));
+            // Room for the bottom tab bar and the system navigation bar, which can sit over this screen.
+            scroll.setPadding(0, 0, 0, AndroidUtilities.dp(DialogsActivity.MAIN_TABS_HEIGHT_WITH_MARGINS) + AndroidUtilities.navigationBarHeight);
             LinearLayout column = new LinearLayout(context);
             column.setOrientation(LinearLayout.VERTICAL);
             scroll.addView(column, LayoutHelper.createScroll(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP));
@@ -1006,7 +1010,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
             int chats = digest.chatCount();
             TextView meta = new TextView(context);
             meta.setText(whenText(digest.time) + " · " + chats + (chats == 1 ? " chat" : " chats") + " · " + digest.posts + " posts");
-            meta.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+            meta.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
             meta.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
             column.addView(meta, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 18, 2, 18, 0));
 
@@ -1014,7 +1018,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
                 TextView warn = new TextView(context);
                 int amber = 0xFFB26A00;
                 warn.setText("Busy window: covers from " + new SimpleDateFormat("HH:mm", Locale.US).format(new Date(digest.coveredSince * 1000L)) + ". Older posts didn't fit.");
-                warn.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+                warn.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
                 warn.setTextColor(amber);
                 warn.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(10), Theme.multAlpha(amber, 0.12f)));
                 warn.setPadding(AndroidUtilities.dp(10), AndroidUtilities.dp(6), AndroidUtilities.dp(10), AndroidUtilities.dp(6));
@@ -1025,32 +1029,45 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
 
             TextView disclaimer = new TextView(context);
             disclaimer.setText("ⓘ Written by a language model from the posts' own text. Early reports are often unverified.");
-            disclaimer.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
+            disclaimer.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 11.5f);
             disclaimer.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
             column.addView(disclaimer, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 18, 0, 18, 8));
 
-            ButtonWithCounterView markRead = new ButtonWithCounterView(context, null);
+            markRead = new ButtonWithCounterView(context, null);
             markRead.setText("Mark " + chats + (chats == 1 ? " chat" : " chats") + " as read", false);
-            markRead.setOnClickListener(v -> {
-                Runnable mark = () -> {
-                    int marked = markDigestedAsRead();
-                    markRead.setEnabled(false);
-                    markRead.setText(marked == 0 ? "Nothing to mark" : "✓ Marked as read", true);
-                };
-                if (digest.truncated && getParentActivity() != null) {
-                    AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
-                    builder.setTitle("Mark as read?");
-                    builder.setMessage("Some older posts in this window didn't fit in the digest. They'll be marked as read too.");
-                    builder.setPositiveButton("Mark as read", (d, w) -> mark.run());
-                    builder.setNegativeButton("Cancel", null);
-                    showDialog(builder.create());
-                } else {
-                    mark.run();
-                }
-            });
-            frame.addView(markRead, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 50, Gravity.BOTTOM, 16, 0, 16, 16));
+            markRead.setOnClickListener(v -> confirmMarkRead());
+            column.addView(markRead, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 46, 16, 8, 16, 16));
             fragmentView = frame;
             return fragmentView;
+        }
+
+        private ButtonWithCounterView markRead;
+        private boolean marked;
+
+        // From the button at the end of the digest or the ✓✓ icon in the top bar.
+        private void confirmMarkRead() {
+            if (marked) {
+                return;
+            }
+            Runnable mark = () -> {
+                int chats = markDigestedAsRead();
+                marked = true;
+                if (markRead != null) {
+                    markRead.setEnabled(false);
+                    markRead.setText(chats == 0 ? "Nothing to mark" : "✓ Marked as read", true);
+                }
+                BulletinFactory.of(this).createSimpleBulletin(R.raw.contacts_sync_on, chats == 0 ? "Nothing to mark." : "Marked " + chats + (chats == 1 ? " chat" : " chats") + " as read.").show();
+            };
+            if (digest.truncated && getParentActivity() != null) {
+                AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+                builder.setTitle("Mark as read?");
+                builder.setMessage("Some older posts in this window didn't fit in the digest. They'll be marked as read too.");
+                builder.setPositiveButton("Mark as read", (d, w) -> mark.run());
+                builder.setNegativeButton("Cancel", null);
+                showDialog(builder.create());
+            } else {
+                mark.run();
+            }
         }
 
         // Each chat in the digest is marked read up to the newest message the digest read, so anything that
