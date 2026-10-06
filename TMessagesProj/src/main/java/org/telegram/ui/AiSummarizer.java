@@ -8,8 +8,6 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
-import org.telegram.messenger.ChatObject;
-import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.UserConfig;
@@ -26,6 +24,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
 
@@ -34,7 +33,6 @@ import java.util.Locale;
 public class AiSummarizer {
 
     public static final String MODEL = "gpt-5.4-mini"; // fixed, same as Scoops
-    public static final int MAX_UNREAD_CHATS = 30;
     private static final int MAX_MESSAGES_PER_CHAT = 1500;
     private static final int PAGE_SIZE = 100;
     private static final long REQUEST_INTERVAL_MS = 1000;
@@ -58,25 +56,35 @@ public class AiSummarizer {
         "Merge them into one summary in exactly the same format, combining duplicate chat sections and the \"Needs you\" section. " +
         "Keep the [r..] references.\n\n" + SYSTEM_PROMPT;
 
-    // The Digest tab and the morning digest: news from the chosen chats and channels, grouped by topic (after
-    // Scoops' digest). Duplicates across channels are merged; [rN] references link back to the source posts.
-    private static final String DIGEST_PROMPT =
-        "You summarize the latest news from Telegram channels and chats the user follows. You will be given the " +
-        "messages posted in the last %s, newest first, each with a reference like [r12], its chat, its posting time " +
-        "(HH:MM) and its text. The user appears as \"Me\".\n" +
-        "Write the digest in the language most of the messages are written in.\n" +
+    // The Digest tab: news from the kept chats and channels, grouped by topic (after Scoops' digest), always in
+    // Hebrew. Duplicates across channels are merged; [rN] references link back to the source posts.
+    private static final String DIGEST_RULES =
+        "Write the digest in Hebrew.\n" +
         "Format it as Markdown. Group related messages into topics, at most six. Give each topic a `## ` heading, " +
-        "then `-` bullets, one per distinct development, newest first, starting with its posting time (HH:MM). " +
-        "Use `**bold**` for the key fact of each bullet. Merge messages that report the same thing, even from " +
-        "different chats. End every bullet with 1 or 2 references copied from the input, like [r12]; only use " +
-        "references that appear in the input. Skip small talk, ads and promotions. Do not use tables, code blocks " +
-        "or other headings. Keep the whole digest under 450 words.\n" +
+        "then `-` bullets, one per distinct development, newest first. Start every bullet with its posting time " +
+        "exactly as given in the input (\"HH:MM\", or \"אתמול HH:MM\" for yesterday). Use `**bold**` for the key " +
+        "fact of each bullet. Merge messages that report the same thing, even from different chats. End every bullet " +
+        "with 1 or 2 references copied from the input, like [r12]; only use references that appear in the input. " +
+        "Skip small talk, ads and promotions. Do not use tables, code blocks or other headings. Keep the whole " +
+        "digest under 450 words.\n" +
         "Do not invent details that are not in the messages. Many are unverified first reports: describe them as " +
         "reports, and say so plainly when messages contradict each other.";
 
-    // The digest transcript budget, shared evenly so every message makes it in: a few get up to 700
-    // characters each, a busy day gets less (never under 150).
-    private static final int DIGEST_CHARS = 40_000;
+    private static final String DIGEST_PROMPT =
+        "You summarize the latest news from Telegram channels and chats the user follows. You will be given the " +
+        "messages posted in the last %s, newest first, one per line: a reference like [r12], the chat, the posting " +
+        "time, then the text.\n" + DIGEST_RULES;
+
+    private static final String DIGEST_MERGE_PROMPT =
+        "You are given several partial news digests of the same Telegram chats over the last %s, each covering a " +
+        "different stretch of time. Merge them into one digest: combine topics that are about the same story, keep " +
+        "every bullet's time and [r..] references, and drop exact repeats.\n" + DIGEST_RULES;
+
+    // At most this many posts per digest (about 8 busy hours of a few channels), shared across the chats, and at
+    // most 3 slices of SLICE_CHARS each: every slice is summarized, then the parts are merged.
+    private static final int DIGEST_MAX_POSTS = 550;
+    private static final int SLICE_CHARS = 40_000;
+    private static final int MAX_SLICES = 3;
 
     private static final String ASK_PROMPT =
         "You answer the user's question about a Telegram chat. The user appears as \"Me\". " +
@@ -127,29 +135,6 @@ public class AiSummarizer {
         this.chatTexts = new StringBuilder[dialogIds.size()];
     }
 
-    // Unread private chats and groups with activity in the window. Channels and secret chats are skipped.
-    public static ArrayList<Long> unreadChats(int account, int sinceDate) {
-        MessagesController controller = MessagesController.getInstance(account);
-        ArrayList<Long> result = new ArrayList<>();
-        for (TLRPC.Dialog dialog : controller.getAllDialogs()) {
-            if (result.size() >= MAX_UNREAD_CHATS) {
-                break;
-            }
-            long did = dialog.id;
-            if (DialogObject.isEncryptedDialog(did) || DialogObject.isFolderDialogId(did) || dialog.last_message_date < sinceDate) {
-                continue;
-            }
-            if (dialog.unread_count <= 0 && !dialog.unread_mark) {
-                continue;
-            }
-            if (did < 0 && ChatObject.isChannelAndNotMegaGroup(controller.getChat(-did))) {
-                continue;
-            }
-            result.add(did);
-        }
-        return result;
-    }
-
     public static String chatTitle(int account, long did) {
         MessagesController controller = MessagesController.getInstance(account);
         if (did > 0) {
@@ -162,6 +147,14 @@ public class AiSummarizer {
 
     private String question;
     private String digestWindow;
+    private java.util.HashMap<Long, Integer> minIds;
+    private int[] collected;
+
+    // Digest results besides the text: posts summarized, and whether a busy chat or the slice limit cut older
+    // posts (then coveredSince is the oldest posting time that made it in).
+    public int digestPosts;
+    public boolean truncated;
+    public int coveredSince;
 
     // One collected message, for the digest's newest-first, evenly budgeted transcript.
     private static class Entry {
@@ -169,42 +162,91 @@ public class AiSummarizer {
         final String chat;
         final String ref;
         final String body;
+        final long groupId;
+        final boolean mediaOnly;
 
-        Entry(int date, String chat, String ref, String body) {
+        Entry(int date, String chat, String ref, String body, long groupId, boolean mediaOnly) {
             this.date = date;
             this.chat = chat;
             this.ref = ref;
             this.body = body;
+            this.groupId = groupId;
+            this.mediaOnly = mediaOnly;
         }
     }
 
     private final ArrayList<Entry> entries = new ArrayList<>();
 
-    // Digest tab / morning digest: a news digest of all chats together; window names the time span ("2 hours").
+    // Digest tab: a news digest of all chats together; window names the time span ("2 hours").
     public void setNewsDigest(String window) {
         this.digestWindow = window;
     }
 
-    private String digestTranscript() {
+    // "Since last digest": per chat, only messages newer than these ids.
+    public void setMinMessageIds(java.util.HashMap<Long, Integer> minIds) {
+        this.minIds = minIds;
+    }
+
+    private int minIdFor(long did) {
+        Integer id = minIds == null ? null : minIds.get(did);
+        return Math.max(minMessageId, id == null ? 0 : id);
+    }
+
+    // Per-chat fetch cap: in a digest, the post budget shared across the chats.
+    private int capPerChat() {
+        return digestWindow == null ? MAX_MESSAGES_PER_CHAT : Math.max(20, (DIGEST_MAX_POSTS + dialogIds.size() - 1) / dialogIds.size());
+    }
+
+    // "08:54", or "אתמול 23:40" for a post from before midnight.
+    private static String digestTime(int date) {
+        Calendar now = Calendar.getInstance();
+        Calendar then = Calendar.getInstance();
+        then.setTimeInMillis(date * 1000L);
+        String clock = new SimpleDateFormat("HH:mm", Locale.US).format(then.getTime());
+        boolean today = now.get(Calendar.YEAR) == then.get(Calendar.YEAR) && now.get(Calendar.DAY_OF_YEAR) == then.get(Calendar.DAY_OF_YEAR);
+        return today ? clock : "אתמול " + clock;
+    }
+
+    // Newest first, without exact repeats (forwards), caption-less media or extra album items; the budget is
+    // shared evenly over what's left and packed into at most MAX_SLICES slices.
+    private ArrayList<String> digestSlices() {
         ArrayList<Entry> sorted = new ArrayList<>(entries);
         java.util.Collections.sort(sorted, (a, b) -> Integer.compare(b.date, a.date));
-        int perItem = Math.max(150, Math.min(700, DIGEST_CHARS / Math.max(1, sorted.size()) - 60));
-        java.util.HashSet<String> seen = new java.util.HashSet<>();
-        SimpleDateFormat clock = new SimpleDateFormat("HH:mm", Locale.US);
-        StringBuilder out = new StringBuilder();
+        java.util.HashSet<String> seenBodies = new java.util.HashSet<>();
+        java.util.HashSet<Long> seenGroups = new java.util.HashSet<>();
+        ArrayList<Entry> kept = new ArrayList<>();
         for (Entry entry : sorted) {
-            // The same post forwarded to several channels is sent once.
-            if (!seen.add(entry.body)) {
+            if (entry.mediaOnly || entry.groupId != 0 && !seenGroups.add(entry.groupId) || !seenBodies.add(entry.body)) {
                 continue;
             }
-            String body = entry.body.length() > perItem ? entry.body.substring(0, perItem) + "…" : entry.body;
-            String line = entry.ref + " " + entry.chat + " " + clock.format(new Date(entry.date * 1000L)) + ": " + body + "\n";
-            if (out.length() + line.length() > DIGEST_CHARS) {
-                break;
-            }
-            out.append(line);
+            kept.add(entry);
         }
-        return out.toString();
+        int perItem = Math.max(150, Math.min(700, MAX_SLICES * SLICE_CHARS / Math.max(1, kept.size()) - 60));
+        ArrayList<String> slices = new ArrayList<>();
+        StringBuilder slice = new StringBuilder();
+        digestPosts = 0;
+        int oldestIncluded = 0;
+        for (Entry entry : kept) {
+            String body = entry.body.length() > perItem ? entry.body.substring(0, perItem) + "…" : entry.body;
+            String line = entry.ref + " " + entry.chat + " · " + digestTime(entry.date) + ": " + body + "\n";
+            if (slice.length() + line.length() > SLICE_CHARS && slice.length() > 0) {
+                if (slices.size() + 1 >= MAX_SLICES) {
+                    // Older posts beyond the last slice are left out: complete only from the oldest one included.
+                    truncated = true;
+                    coveredSince = Math.max(coveredSince, oldestIncluded);
+                    break;
+                }
+                slices.add(slice.toString());
+                slice = new StringBuilder();
+            }
+            slice.append(line);
+            digestPosts++;
+            oldestIncluded = entry.date;
+        }
+        if (slice.length() > 0) {
+            slices.add(slice.toString());
+        }
+        return slices;
     }
 
     // "Ask this chat" (MyAiChat): answer this question from the newest collected messages instead of summarizing.
@@ -257,12 +299,23 @@ public class AiSummarizer {
             return;
         }
         long did = dialogIds.get(chatIndex);
+        if (collected == null) {
+            collected = new int[dialogIds.size()];
+        }
+        if (offsetId == 0) {
+            // Nothing new in this chat (known locally): skip it without a request.
+            TLRPC.Dialog dialog = MessagesController.getInstance(account).dialogs_dict.get(did);
+            if (dialog != null && (dialog.last_message_date != 0 && dialog.last_message_date < sinceDate || minIdFor(did) > 0 && dialog.top_message <= minIdFor(did))) {
+                loadPage(chatIndex + 1, 0);
+                return;
+            }
+        }
         callback.onProgress("Reading " + chatTitle(account, did) + " (" + (chatIndex + 1) + "/" + dialogIds.size() + ")…");
 
         TLRPC.TL_messages_getHistory req = new TLRPC.TL_messages_getHistory();
         req.peer = MessagesController.getInstance(account).getInputPeer(did);
         req.offset_id = offsetId;
-        req.limit = PAGE_SIZE;
+        req.limit = Math.max(1, Math.min(PAGE_SIZE, capPerChat() - collected[chatIndex]));
         ConnectionsManager.getInstance(account).sendRequest(req, (response, error) -> AndroidUtilities.runOnUIThread(() -> {
             if (cancelled) {
                 return;
@@ -288,12 +341,14 @@ public class AiSummarizer {
             int lastId = offsetId;
             // Newest first; collect into a list and prepend so the chat text reads oldest to newest.
             ArrayList<String> lines = new ArrayList<>();
+            int oldestDate = 0;
             for (TLRPC.Message message : res.messages) {
                 lastId = message.id;
-                if (message.date < sinceDate || message.id <= minMessageId) {
+                if (message.date < sinceDate || message.id <= minIdFor(did)) {
                     reachedStart = true;
                     break;
                 }
+                oldestDate = message.date;
                 String line = formatMessage(did, message);
                 if (line != null) {
                     lines.add(line);
@@ -311,20 +366,18 @@ public class AiSummarizer {
                 text.insert(0, page);
                 messageCount += lines.size();
             }
-            int collected = text == null ? 0 : countLines(text);
-            boolean next = reachedStart || res.messages.size() < PAGE_SIZE || collected >= MAX_MESSAGES_PER_CHAT;
+            collected[chatIndex] += lines.size();
+            boolean capped = !reachedStart && res.messages.size() >= req.limit && collected[chatIndex] >= capPerChat();
+            if (capped) {
+                // This chat had more posts in the window than its share: complete only from the oldest one read.
+                truncated = true;
+                coveredSince = Math.max(coveredSince, oldestDate);
+            }
+            boolean next = reachedStart || res.messages.size() < req.limit || capped;
             int nextChat = next ? chatIndex + 1 : chatIndex;
             int nextOffset = next ? 0 : lastId;
             AndroidUtilities.runOnUIThread(() -> loadPage(nextChat, nextOffset), REQUEST_INTERVAL_MS);
         }));
-    }
-
-    private static int countLines(StringBuilder text) {
-        int count = 0;
-        for (int i = 0; i < text.length(); i++) {
-            if (text.charAt(i) == '\n') count++;
-        }
-        return count;
     }
 
     private String formatMessage(long did, TLRPC.Message message) {
@@ -343,7 +396,8 @@ public class AiSummarizer {
         Ref ref = new Ref(did, message.id);
         ref.out = message.out;
         refs.add(ref);
-        entries.add(new Entry(message.date, chatTitle(account, did), "[r" + refs.size() + "]", body.replace('\n', ' ')));
+        entries.add(new Entry(message.date, chatTitle(account, did), "[r" + refs.size() + "]", body.replace('\n', ' '),
+            message.grouped_id, media != null && (message.message == null || message.message.trim().isEmpty())));
         String time = new SimpleDateFormat("EEE HH:mm", Locale.US).format(new Date(message.date * 1000L));
         return "[r" + refs.size() + "] " + time + " " + senderName(message) + (message.mentioned ? " (mentions Me)" : "") + ": " + body.replace('\n', ' ');
     }
@@ -380,14 +434,29 @@ public class AiSummarizer {
         String key = prefs().getString("apiKey", "");
         String model = MODEL;
         if (digestWindow != null) {
-            String transcript = digestTranscript();
+            ArrayList<String> slices = digestSlices();
             String system = String.format(Locale.US, DIGEST_PROMPT, digestWindow);
             Utilities.globalQueue.postRunnable(() -> {
                 try {
-                    AndroidUtilities.runOnUIThread(() -> callback.onProgress("Summarizing…"));
-                    String digest = complete(key, model, system, transcript);
+                    String digest;
+                    if (slices.size() <= 1) {
+                        AndroidUtilities.runOnUIThread(() -> callback.onProgress("Summarizing " + digestPosts + " posts…"));
+                        digest = complete(key, model, system, slices.isEmpty() ? "" : slices.get(0));
+                    } else {
+                        StringBuilder parts = new StringBuilder();
+                        for (int i = 0; i < slices.size(); i++) {
+                            if (cancelled) return;
+                            String progress = "Summarizing part " + (i + 1) + " of " + slices.size() + "…";
+                            AndroidUtilities.runOnUIThread(() -> callback.onProgress(progress));
+                            parts.append("--- Part ").append(i + 1).append(" ---\n").append(complete(key, model, system, slices.get(i))).append("\n\n");
+                        }
+                        if (cancelled) return;
+                        AndroidUtilities.runOnUIThread(() -> callback.onProgress("Merging…"));
+                        digest = complete(key, model, String.format(Locale.US, DIGEST_MERGE_PROMPT, digestWindow), parts.toString());
+                    }
+                    String finalDigest = digest;
                     if (!cancelled) {
-                        AndroidUtilities.runOnUIThread(() -> callback.onDone(digest));
+                        AndroidUtilities.runOnUIThread(() -> callback.onDone(finalDigest));
                     }
                 } catch (Exception e) {
                     String message = TextUtils.isEmpty(e.getMessage()) ? e.toString() : e.getMessage();
