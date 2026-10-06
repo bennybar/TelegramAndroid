@@ -1097,7 +1097,24 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
                     markRead.setAlpha(0.6f);
                     markRead.setText(chats == 0 ? "Nothing to mark" : "✓ Marked as read");
                 }
-                BulletinFactory.of(this).createSimpleBulletin(R.raw.contacts_sync_on, chats == 0 ? "Nothing to mark." : "Marked " + chats + (chats == 1 ? " chat" : " chats") + " as read.").show();
+                String done = chats == 0 ? "Nothing to mark." : "Marked " + chats + (chats == 1 ? " chat" : " chats") + " as read.";
+                // Back to the chat list: close the digest and switch the main tabs to Chats.
+                MainTabsActivity tabs = null;
+                if (getParentLayout() != null) {
+                    for (BaseFragment fragment : getParentLayout().getFragmentStack()) {
+                        if (fragment instanceof MainTabsActivity) {
+                            tabs = (MainTabsActivity) fragment;
+                        }
+                    }
+                }
+                if (tabs == null) {
+                    BulletinFactory.of(this).createSimpleBulletin(R.raw.contacts_sync_on, done).show();
+                    return;
+                }
+                MainTabsActivity finalTabs = tabs;
+                finalTabs.myShowChats();
+                finishFragment();
+                AndroidUtilities.runOnUIThread(() -> BulletinFactory.of(finalTabs).createSimpleBulletin(R.raw.contacts_sync_on, done).show(), 300);
             };
             if (digest.truncated && getParentActivity() != null) {
                 AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
