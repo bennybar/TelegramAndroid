@@ -509,6 +509,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
     private boolean downloadsItemVisible;
     public ActionBarMenuItem searchItem;
     private ActionBarMenuItem optionsItem;
+    private ActionBarMenuItem markAllItem;
     private ActionBarMenuItem speedItem;
     public static boolean switchingTheme;
     private ActionBarMenuItem doneItem;
@@ -3450,6 +3451,11 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         });
         fragmentSearchFieldWatcher.setDoNotCloseAfterFieldEmpty();
 
+        if (initialDialogsType == DIALOGS_TYPE_DEFAULT && MyUiTweaks.markAllButton()) {
+            markAllItem = menu.addItem(9410, R.drawable.msg_markread);
+            markAllItem.setContentDescription(LocaleController.getString(R.string.MarkAllAsRead));
+            markAllItem.setOnClickListener(v -> confirmMarkAllRead());
+        }
         if (initialDialogsType == DIALOGS_TYPE_DEFAULT) {
             optionsItem = menu.addItem(4, R.drawable.ic_ab_other);
             optionsItem.setContentDescription(LocaleController.getString(R.string.AccDescrMoreOptions));
@@ -9791,6 +9797,29 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         getMessagesController().markDialogAsUnread(did, null, 0);
     }
 
+    // Tegram: the top bar's mark-all-as-read button, for the chats in the open tab.
+    private void confirmMarkAllRead() {
+        if (getParentActivity() == null || viewPages == null) {
+            return;
+        }
+        ArrayList<TLRPC.Dialog> unread = new ArrayList<>();
+        for (TLRPC.Dialog dialog : getDialogsArray(currentAccount, viewPages[0].dialogsType, folderId, dialogsListFrozen)) {
+            if (!DialogObject.isFolderDialogId(dialog.id) && (dialog.unread_count > 0 || dialog.unread_mark || dialog.unread_mentions_count > 0)) {
+                unread.add(dialog);
+            }
+        }
+        if (unread.isEmpty()) {
+            BulletinFactory.of(this).createSimpleBulletin(R.raw.done, "No unread chats here.").show();
+            return;
+        }
+        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
+        builder.setTitle(LocaleController.getString(R.string.MarkAllAsRead));
+        builder.setMessage("Mark " + unread.size() + (unread.size() == 1 ? " chat" : " chats") + " as read?");
+        builder.setPositiveButton(LocaleController.getString(R.string.MarkAsRead), (d, w) -> markDialogsAsRead(unread));
+        builder.setNegativeButton(LocaleController.getString(R.string.Cancel), null);
+        showDialog(builder.create());
+    }
+
     private void markDialogsAsRead(ArrayList<TLRPC.Dialog> dialogs) {
         debugLastUpdateAction = 2;
         int selectedDialogIndex = -1;
@@ -14326,6 +14355,7 @@ public class DialogsActivity extends BaseFragment implements NotificationCenter.
         final float factor3 = 1f - animatorDoneButtonVisible.getFloatValue();
         final float factor = factor1 * factor2 * factor3;
         FragmentFloatingButton.setAnimatedVisibility(optionsItem, factor);
+        FragmentFloatingButton.setAnimatedVisibility(markAllItem, factor);
     }
 
     private void checkUi_itemPasscodeVisibility() {

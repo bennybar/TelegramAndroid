@@ -150,6 +150,7 @@ public class MySettings {
     private static final int ID_RESTART = 243;
     private static final int ID_OPENAI_KEY = 244;
     private static final int ID_VOICE_NAMES = 245;
+    private static final int ID_MARK_ALL_BUTTON = 246;
     private static final int ID_CLUTTER_BASE = 230; // 230..235, one per MyChatTweaks.CLUTTER_KEYS
     private static final String[][] CLUTTER_ROWS = {
         {"Star reactions", "The ⭐ paid reaction in reaction bars and under posts."},
@@ -229,6 +230,8 @@ public class MySettings {
             .setChecked(MyUiTweaks.yesterdayLabel()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_DIM_MUTED, "Dim muted chats", "Muted chats are drawn faded, so unmuted ones stand out.")
             .setChecked(MyUiTweaks.dimMuted()).setMultiline(true));
+        items.add(next++, UItem.asButtonCheck(ID_MARK_ALL_BUTTON, "Mark all as read button", "A ✓✓ next to the ⋮ menu marks every chat in the open tab as read, after asking.")
+            .setChecked(MyUiTweaks.markAllButton()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_COMPACT_SEARCH, "Compact search bar", "A slimmer search field above the chat list.")
             .setChecked(MyUiTweaks.compactSearch()).setMultiline(true));
         items.add(next++, UItem.asButtonCheck(ID_MD3_TAB_BAR, "Material bottom bar", "A flat, full-width Material 3 bar instead of the floating glass one.")
@@ -367,6 +370,12 @@ public class MySettings {
         if (item.id == ID_TIME_GAPS) {
             MyTimeGaps.toggle();
             refresh.run();
+            return true;
+        }
+        if (item.id == ID_MARK_ALL_BUTTON) {
+            MyUiTweaks.toggle("hideMarkAllButton");
+            refresh.run();
+            restartBulletin(fragment, "Reopen Tegram to apply.");
             return true;
         }
         if (item.id == ID_YESTERDAY || item.id == ID_DIM_MUTED) {
