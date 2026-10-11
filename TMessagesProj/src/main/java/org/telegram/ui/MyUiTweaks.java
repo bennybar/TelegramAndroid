@@ -139,6 +139,11 @@ public class MyUiTweaks {
         return text.isEmpty() ? text : Character.toUpperCase(text.charAt(0)) + text.substring(1);
     }
 
+    // DialogsActivity hook: a "mark all as read" button beside the ⋮ menu (on unless turned off).
+    public static boolean markAllButton() {
+        return !pref("hideMarkAllButton");
+    }
+
     // DialogCell hook: muted chats drawn faded, so unmuted ones stand out without re-sorting.
     public static boolean dimMuted() {
         return pref("dimMuted");
