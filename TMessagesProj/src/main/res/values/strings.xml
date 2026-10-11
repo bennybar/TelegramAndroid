@@ -2260,6 +2260,9 @@
     <string name="OfflineTranscriptionInfo">Transcription runs on your device through a separate engine app, such as **Scrib** on F-Droid.</string>
     <string name="OfflineTranscriptionMissing">App not installed</string>
     <string name="OfflineTranscriptionNoModel">No model downloaded yet. Open %1$s to download a language model.</string>
+    <string name="VideoSubtitles">Subtitles</string>
+    <string name="VideoSubtitlesGenerating">Generating subtitles…</string>
+    <string name="VideoSubtitlesUnavailable">Download the video to generate subtitles</string>
     <string name="CloudflareCredentialsNotSet">Cloudflare credentials are not configured.</string>
     <string name="CloudflareAccountID">Account ID</string>
     <string name="CloudflareAPIToken">API Token</string>
@@ -11493,4 +11496,13 @@
     <string name="FolderTabsStyleInfo">Choose how folders appear in the tab bar. Assign an icon to each folder in its settings.</string>
     <string name="ShareDeleteOriginals">Delete original messages</string>
     <string name="SendAsSinglePhoto">Send as one photo</string>
+    <string name="WebPublish">Publish to web</string>
+    <string name="WebPublishSection">Web Publishing</string>
+    <string name="WebPublishInfo">Build text from selected messages, upload it with media to the web service in one request, then copy the page link to the clipboard. No local files are kept: media lives only in a temporary cache until the upload finishes.</string>
+    <string name="WebPublishBase">Service base URL</string>
+    <string name="WebPublishBaseHint">https://example.com</string>
+    <string name="WebPublishToken">Upload token</string>
+    <string name="WebPublishTemplate">Clipboard template (%q = link)</string>
+    <string name="WebPublishAdvanced">Advanced</string>
+    <string name="WebPublishSaved">Publish settings saved</string>
 </resources>
