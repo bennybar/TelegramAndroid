@@ -27,6 +27,8 @@
             </intent-filter>
         </receiver>
         <receiver android:name="org.telegram.ui.MyReminders$AlarmReceiver" android:exported="false" />
+        <!-- Voice message summaries keep running after leaving the app (org.telegram.ui.MyVoiceNotes) -->
+        <service android:name="org.telegram.ui.MyVoiceNotes$WorkService" android:exported="false" android:foregroundServiceType="dataSync" />
         <!-- Messages-style launcher icon (org.telegram.ui.MyIcons), off until chosen in settings -->
         <activity-alias
             android:name="org.telegram.messenger.MyBubbleIcon"
