@@ -47,6 +47,7 @@ import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.UserObject;
@@ -825,6 +826,11 @@ public class MyVoiceNotes {
         message.messageOwner.voiceTranscriptionOpen = true;
         TranscribeButton.openVideoTranscription(message);
         TranscribeButton.finishTranscription(message, id, transcript);
+        // Saved collapsed: reopening the chat shows just the voice message (the summary is a tap away).
+        TLRPC.Message closed = new TLRPC.TL_message();
+        closed.voiceTranscriptionFinal = true;
+        closed.voiceTranscriptionId = id;
+        MessagesStorage.getInstance(message.currentAccount).updateMessageVoiceTranscription(message.getDialogId(), message.getId(), transcript, closed);
     }
 
     // ---- The reply (build_reply_messages) and its buttons ----
