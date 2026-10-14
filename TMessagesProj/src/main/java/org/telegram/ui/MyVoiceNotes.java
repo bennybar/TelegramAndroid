@@ -33,7 +33,6 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.core.app.NotificationCompat;
@@ -47,7 +46,6 @@ import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
-import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.UserObject;
@@ -59,7 +57,6 @@ import org.telegram.ui.ActionBar.BottomSheet;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.LayoutHelper;
-import org.telegram.ui.Components.TranscribeButton;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
@@ -241,7 +238,6 @@ public class MyVoiceNotes {
         builder.setTitle("Voice message summary");
         builder.setItems(new CharSequence[]{"Show saved summary", "Redo"}, (d, which) -> {
             if (which == 0) {
-                applyTranscript(message, cached.transcript);
                 showNote(chat, message, cached);
             } else {
                 cache().edit().remove(cacheKey(message)).apply();
@@ -537,8 +533,6 @@ public class MyVoiceNotes {
                 finish(message, progress, null, "🤷 לא הצלחתי לשמוע כלום.");
                 return;
             }
-            String finalTranscript = transcript;
-            AndroidUtilities.runOnUIThread(() -> applyTranscript(message, finalTranscript)); // visible in the bubble while summarizing
             setProgress(progress, "✍️ מסכם...", 80);
 
             JSONObject analysis;
@@ -817,36 +811,10 @@ public class MyVoiceNotes {
         return path != null && path.exists() ? path : null;
     }
 
-    // Where each transcript was last shown: it stays under the voice message only in that chat screen.
-    private static final java.util.HashMap<Long, java.lang.ref.WeakReference<org.telegram.ui.ActionBar.BaseFragment>> shownIn = new java.util.HashMap<>();
-
-    // MessageObject.isVoiceTranscriptionOpen hook: our notes show the transcript only in the chat screen where it was
-    // just made or opened, so reopening the chat (or the app) shows just the voice message.
+    // MessageObject.isVoiceTranscriptionOpen hook: our notes never show the transcript under the voice message
+    // (it's in the summary's 📜 full transcript), including notes from older versions that saved it open.
     public static boolean showTranscript(MessageObject message) {
-        if (message.getDocument() == null || !useButton(message)) {
-            return true;
-        }
-        java.lang.ref.WeakReference<org.telegram.ui.ActionBar.BaseFragment> ref = shownIn.get(message.getDocument().id);
-        return ref != null && ref.get() != null && ref.get() == LaunchActivity.getSafeLastFragment();
-    }
-
-    // Fills Telegram's transcription spot under the voice message, locally (like the fork's offline transcription).
-    private static void applyTranscript(MessageObject message, String transcript) {
-        shownIn.put(message.getDocument().id, new java.lang.ref.WeakReference<>(LaunchActivity.getSafeLastFragment()));
-        if (message.messageOwner == null || transcript.equals(message.messageOwner.voiceTranscription) && message.messageOwner.voiceTranscriptionOpen) {
-            return;
-        }
-        long id = Utilities.random.nextLong();
-        message.messageOwner.voiceTranscription = transcript;
-        message.messageOwner.voiceTranscriptionId = id;
-        message.messageOwner.voiceTranscriptionOpen = true;
-        TranscribeButton.openVideoTranscription(message);
-        TranscribeButton.finishTranscription(message, id, transcript);
-        // Saved collapsed: reopening the chat shows just the voice message (the summary is a tap away).
-        TLRPC.Message closed = new TLRPC.TL_message();
-        closed.voiceTranscriptionFinal = true;
-        closed.voiceTranscriptionId = id;
-        MessagesStorage.getInstance(message.currentAccount).updateMessageVoiceTranscription(message.getDialogId(), message.getId(), transcript, closed);
+        return message.getDocument() == null || !useButton(message);
     }
 
     // ---- The reply (build_reply_messages) and its buttons ----
@@ -956,7 +924,7 @@ public class MyVoiceNotes {
 
         // The text scrolls inside a capped height, so the sheet stays clear of the status bar and camera cutout,
         // and the buttons stay pinned below it.
-        ScrollView scroll = new ScrollView(activity) {
+        androidx.core.widget.NestedScrollView scroll = new androidx.core.widget.NestedScrollView(activity) {
             @Override
             protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
                 int max = AndroidUtilities.displaySize.y - AndroidUtilities.statusBarHeight - AndroidUtilities.dp(56 + 50 + 66);
@@ -976,7 +944,8 @@ public class MyVoiceNotes {
         builder.setTitle("Voice message summary", true);
         builder.setCustomView(content);
         BottomSheet sheet = builder.create();
-        sheet.setCanDismissWithSwipe(false); // dragging scrolls the text; tap outside or back closes
+        // Dragging scrolls the text; once it's at the top, dragging further down pulls the sheet closed.
+        sheet.setCanDismissWithSwipe(false);
         sheet.setOnDismissListener(d -> stopPlayback());
 
         transcriptButton.setOnClickListener(v -> {
