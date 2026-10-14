@@ -946,28 +946,46 @@ public class MyVoiceNotes {
 
         LinearLayout buttons = new LinearLayout(activity);
         buttons.setOrientation(LinearLayout.HORIZONTAL);
-        buttons.setPadding(AndroidUtilities.dp(14), 0, AndroidUtilities.dp(14), AndroidUtilities.dp(14));
+        buttons.setPadding(AndroidUtilities.dp(14), AndroidUtilities.dp(10), AndroidUtilities.dp(14), AndroidUtilities.dp(14));
         TextView transcriptButton = tonalButton(activity, "📜 תמלול מלא");
         TextView listenButton = tonalButton(activity, "🔊 האזן לסיכום");
         TextView askButton = tonalButton(activity, "💬 שאל");
         buttons.addView(transcriptButton, LayoutHelper.createLinear(0, 42, 1f, 4, 0, 4, 0));
         buttons.addView(listenButton, LayoutHelper.createLinear(0, 42, 1f, 4, 0, 4, 0));
         buttons.addView(askButton, LayoutHelper.createLinear(0, 42, 0.7f, 4, 0, 4, 0));
-        column.addView(buttons);
 
-        ScrollView scroll = new ScrollView(activity);
+        // The text scrolls inside a capped height, so the sheet stays clear of the status bar and camera cutout,
+        // and the buttons stay pinned below it.
+        ScrollView scroll = new ScrollView(activity) {
+            @Override
+            protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+                int max = AndroidUtilities.displaySize.y - AndroidUtilities.statusBarHeight - AndroidUtilities.dp(56 + 50 + 66);
+                super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(Math.max(AndroidUtilities.dp(120), max), MeasureSpec.AT_MOST));
+            }
+        };
+        scroll.setVerticalScrollBarEnabled(true);
         scroll.addView(column);
+        View divider = new View(activity);
+        divider.setBackgroundColor(Theme.getColor(Theme.key_divider));
+        LinearLayout content = new LinearLayout(activity);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.addView(scroll, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+        content.addView(divider, new LinearLayout.LayoutParams(LayoutHelper.MATCH_PARENT, 1));
+        content.addView(buttons, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
         BottomSheet.Builder builder = new BottomSheet.Builder(activity);
         builder.setTitle("Voice message summary", true);
-        builder.setCustomView(scroll);
+        builder.setCustomView(content);
         BottomSheet sheet = builder.create();
+        sheet.setCanDismissWithSwipe(false); // dragging scrolls the text; tap outside or back closes
         sheet.setOnDismissListener(d -> stopPlayback());
 
         transcriptButton.setOnClickListener(v -> {
             SpannableStringBuilder text = new SpannableStringBuilder();
             bold(text, "📜 תמלול מלא");
             text.append("\n").append(note.transcript);
-            column.addView(sheetText(activity, text), 1);
+            TextView transcriptView = sheetText(activity, text);
+            column.addView(transcriptView, 1);
+            scroll.post(() -> scroll.smoothScrollTo(0, transcriptView.getTop()));
             transcriptButton.setEnabled(false);
             transcriptButton.setAlpha(0.5f);
         });
