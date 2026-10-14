@@ -127,7 +127,8 @@ public class MyVoiceNotes {
 
     // TranscribeButton hook: a tap on the closed button runs Transcribe & summarize instead of Telegram's
     // transcription (or its Premium offer). Tapping the open button still collapses the transcript.
-    public static boolean onButtonTap(MessageObject message) {
+    public static boolean onButtonTap(org.telegram.ui.Cells.ChatMessageCell cell) {
+        MessageObject message = cell.getMessageObject();
         if (!useButton(message)) {
             return false;
         }
@@ -135,7 +136,7 @@ public class MyVoiceNotes {
         if (!(fragment instanceof ChatActivity)) {
             return false;
         }
-        start((ChatActivity) fragment, message);
+        start((ChatActivity) fragment, message, cell);
         return true;
     }
 
@@ -226,14 +227,14 @@ public class MyVoiceNotes {
     }
 
     // From the transcribe button on a voice note or video message.
-    private static void start(ChatActivity chat, MessageObject message) {
+    private static void start(ChatActivity chat, MessageObject message, View cell) {
         Activity activity = chat.getParentActivity();
         if (activity == null || running.containsKey(message.getDocument().id)) {
             return;
         }
         Note cached = Note.load(cacheKey(message));
         if (cached == null) {
-            run(message);
+            run(message, cell);
             return;
         }
         AlertDialog.Builder builder = new AlertDialog.Builder(activity);
@@ -244,7 +245,7 @@ public class MyVoiceNotes {
                 showNote(chat, message, cached);
             } else {
                 cache().edit().remove(cacheKey(message)).apply();
-                run(message);
+                run(message, cell);
             }
         });
         chat.showDialog(builder.create());
@@ -252,9 +253,10 @@ public class MyVoiceNotes {
 
     // In the background, kept alive by a foreground service even after leaving the app: the button spins until
     // it's done, then the summary pops up if you're still in that chat, or a notification opens it.
-    private static void run(MessageObject message) {
+    private static void run(MessageObject message, View cell) {
         Job progress = new Job(message.getDocument().id, AiSummarizer.chatTitle(message.currentAccount, message.getDialogId()));
         running.put(progress.docId, progress);
+        cell.invalidate(); // start spinning now, not on the cell's next redraw
         WorkService.update();
         withFile(message, progress, file -> Utilities.globalQueue.postRunnable(() -> process(message, file, progress)));
     }
