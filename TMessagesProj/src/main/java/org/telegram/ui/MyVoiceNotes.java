@@ -1,6 +1,16 @@
 package org.telegram.ui;
 
 import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.app.Service;
+import android.content.Intent;
+import android.content.pm.ServiceInfo;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.IBinder;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Canvas;
@@ -25,6 +35,8 @@ import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+
+import androidx.core.app.NotificationCompat;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -208,24 +220,60 @@ public class MyVoiceNotes {
     // From the transcribe button on a voice note or video message.
     private static void start(ChatActivity chat, MessageObject message) {
         Activity activity = chat.getParentActivity();
-        if (activity == null) {
+        if (activity == null || running.containsKey(message.getDocument().id)) {
             return;
         }
         Note cached = Note.load(cacheKey(message));
-        if (cached != null) {
-            applyTranscript(message, cached.transcript);
-            showNote(chat, message, cached);
+        if (cached == null) {
+            run(message);
             return;
         }
-        // In the background: the button spins until it's done, then the summary pops up.
-        long docId = message.getDocument().id;
-        if (running.containsKey(docId)) {
-            return;
+        AlertDialog.Builder builder = new AlertDialog.Builder(activity);
+        builder.setTitle("Voice message summary");
+        builder.setItems(new CharSequence[]{"Show saved summary", "Redo"}, (d, which) -> {
+            if (which == 0) {
+                applyTranscript(message, cached.transcript);
+                showNote(chat, message, cached);
+            } else {
+                cache().edit().remove(cacheKey(message)).apply();
+                run(message);
+            }
+        });
+        chat.showDialog(builder.create());
+    }
+
+    // In the background, kept alive by a foreground service even after leaving the app: the button spins until
+    // it's done, then the summary pops up if you're still in that chat, or a notification opens it.
+    private static void run(MessageObject message) {
+        Job progress = new Job(message.getDocument().id);
+        running.put(progress.docId, progress);
+        WorkService.update();
+        withFile(message, progress, file -> Utilities.globalQueue.postRunnable(() -> process(message, file, progress)));
+    }
+
+    // The chat showing this message, when it's on screen.
+    private static ChatActivity visibleChat(MessageObject message) {
+        org.telegram.ui.ActionBar.BaseFragment fragment = LaunchActivity.getSafeLastFragment();
+        if (ApplicationLoader.mainInterfacePaused || !(fragment instanceof ChatActivity) || ((ChatActivity) fragment).getDialogId() != message.getDialogId()) {
+            return null;
         }
-        Job progress = new Job(docId);
-        running.put(docId, progress);
-        boolean[] cancelled = {false};
-        withFile(chat, message, progress, cancelled, file -> Utilities.globalQueue.postRunnable(() -> process(chat, message, file, progress, cancelled)));
+        return (ChatActivity) fragment;
+    }
+
+    // The end of a job: the sheet (or error) in the open chat, otherwise a notification.
+    private static void finish(MessageObject message, Job progress, Note note, String error) {
+        AndroidUtilities.runOnUIThread(() -> {
+            progress.dismiss();
+            WorkService.update();
+            ChatActivity chat = visibleChat(message);
+            if (chat != null && note != null) {
+                showNote(chat, message, note);
+            } else if (chat != null) {
+                BulletinFactory.of(chat).createErrorBulletin(error).show();
+            } else {
+                notifyDone(message, note, error);
+            }
+        });
     }
 
     // The voice file id is the same for every forward of the note, like the bot's file_unique_id.
@@ -233,11 +281,122 @@ public class MyVoiceNotes {
         return "doc_" + message.getDocument().id;
     }
 
+    // ---- Background: the foreground service and the "done" notification ----
+
+    private static final String CHANNEL_WORK = "my_voice_work";
+    private static final String CHANNEL_DONE = "my_voice_done";
+    private static final String ACTION_OPEN = "org.telegram.ui.MyVoiceNotes.OPEN";
+    private static final int WORK_NOTIFICATION_ID = 0x7E7F00;
+
+    private static NotificationManager notificationManager() {
+        Context context = ApplicationLoader.applicationContext;
+        NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            manager.createNotificationChannel(new NotificationChannel(CHANNEL_WORK, "Voice summaries in progress", NotificationManager.IMPORTANCE_LOW));
+            manager.createNotificationChannel(new NotificationChannel(CHANNEL_DONE, "Voice summaries", NotificationManager.IMPORTANCE_HIGH));
+        }
+        return manager;
+    }
+
+    // Keeps the process alive while notes are being processed; started from a tap, so the app is in the foreground.
+    public static class WorkService extends Service {
+
+        static void update() {
+            Context context = ApplicationLoader.applicationContext;
+            Intent intent = new Intent(context, WorkService.class);
+            try {
+                if (running.isEmpty()) {
+                    context.stopService(intent);
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent);
+                } else {
+                    context.startService(intent);
+                }
+            } catch (Exception e) {
+                FileLog.e(e); // still runs while the app stays open
+            }
+        }
+
+        @Override
+        public int onStartCommand(Intent intent, int flags, int startId) {
+            int count = Math.max(1, running.size());
+            Notification notification = new NotificationCompat.Builder(this, CHANNEL_WORK)
+                .setSmallIcon(MyIcons.notificationIcon())
+                .setContentTitle(count == 1 ? "Summarizing a voice message…" : "Summarizing " + count + " voice messages…")
+                .setProgress(0, 0, true)
+                .setOngoing(true)
+                .build();
+            notificationManager();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(WORK_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
+            } else {
+                startForeground(WORK_NOTIFICATION_ID, notification);
+            }
+            if (running.isEmpty()) {
+                stopSelf();
+            }
+            return START_NOT_STICKY;
+        }
+
+        @Override
+        public IBinder onBind(Intent intent) {
+            return null;
+        }
+    }
+
+    private static void notifyDone(MessageObject message, Note note, String error) {
+        Context context = ApplicationLoader.applicationContext;
+        long docId = message.getDocument().id;
+        Intent open = new Intent(context, LaunchActivity.class).setAction(ACTION_OPEN)
+            .putExtra("dialogId", message.getDialogId())
+            .putExtra("messageId", message.getId())
+            .putExtra("docId", note != null ? docId : 0)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        String chatTitle = AiSummarizer.chatTitle(message.currentAccount, message.getDialogId());
+        String text = error;
+        if (note != null) {
+            text = note.sections.isEmpty() ? note.tone : note.sections.get(0)[1].trim();
+        }
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_DONE)
+            .setSmallIcon(MyIcons.notificationIcon())
+            .setContentTitle((note != null ? "Voice summary ready" : "Voice summary failed") + (TextUtils.isEmpty(chatTitle) ? "" : " · " + chatTitle))
+            .setContentText(text)
+            .setStyle(new NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setContentIntent(PendingIntent.getActivity(context, (int) docId, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT));
+        notificationManager().notify(WORK_NOTIFICATION_ID + 1 + (int) (docId & 0xFFFF), builder.build());
+    }
+
+    // LaunchActivity hook: the notification opens the chat at the voice message, then its summary.
+    public static boolean handleIntent(LaunchActivity activity, Intent intent) {
+        if (intent == null || !ACTION_OPEN.equals(intent.getAction()) || AndroidUtilities.needShowPasscode(false)) {
+            return false;
+        }
+        long dialogId = intent.getLongExtra("dialogId", 0);
+        Bundle args = new Bundle();
+        if (DialogObject.isUserDialog(dialogId)) {
+            args.putLong("user_id", dialogId);
+        } else {
+            args.putLong("chat_id", -dialogId);
+        }
+        args.putInt("message_id", intent.getIntExtra("messageId", 0));
+        Note note = Note.load("doc_" + intent.getLongExtra("docId", 0));
+        AndroidUtilities.runOnUIThread(() -> {
+            ChatActivity chat = new ChatActivity(args);
+            activity.presentFragment(chat);
+            if (note != null) {
+                AndroidUtilities.runOnUIThread(() -> showNote(chat, null, note), 600);
+            }
+        }, 300);
+        return true;
+    }
+
     // ---- The note: transcript, tone and sections (the bot's cache entry) ----
 
     private static class Note {
         String transcript;
         String tone;
+        String forward = "";
         final ArrayList<String[]> sections = new ArrayList<>();
 
         void save(String key) {
@@ -246,7 +405,7 @@ public class MyVoiceNotes {
                 for (String[] s : sections) {
                     list.put(new JSONObject().put("title", s[0]).put("body", s[1]));
                 }
-                cache().edit().putString(key, new JSONObject().put("transcript", transcript).put("tone", tone).put("sections", list).toString()).apply();
+                cache().edit().putString(key, new JSONObject().put("transcript", transcript).put("tone", tone).put("forward", forward).put("sections", list).toString()).apply();
             } catch (Exception e) {
                 FileLog.e(e);
             }
@@ -262,6 +421,7 @@ public class MyVoiceNotes {
                 Note note = new Note();
                 note.transcript = json.getString("transcript");
                 note.tone = json.optString("tone", "—");
+                note.forward = json.optString("forward", "");
                 JSONArray list = json.optJSONArray("sections");
                 for (int i = 0; list != null && i < list.length(); i++) {
                     JSONObject s = list.getJSONObject(i);
@@ -276,7 +436,7 @@ public class MyVoiceNotes {
 
     // ---- Pipeline (the bot's transcribe_voice) ----
 
-    private static void process(ChatActivity chat, MessageObject message, File file, Job progress, boolean[] cancelled) {
+    private static void process(MessageObject message, File file, Job progress) {
         String key = AiSummarizer.prefs().getString("apiKey", "");
         File work = new File(ApplicationLoader.applicationContext.getCacheDir(), "voicenote_" + System.currentTimeMillis());
         MyAudioChunker audio = null;
@@ -328,9 +488,6 @@ public class MyVoiceNotes {
             } else {
                 transcript = transcribe(key, file);
             }
-            if (cancelled[0]) {
-                return;
-            }
             if (transcript.trim().isEmpty() && audio != null) {
                 // Silence is usually a very quiet recording, not an empty one: boost and retry once.
                 File loud = audio.boostQuiet(WHISPER_MAX_BYTES);
@@ -342,14 +499,8 @@ public class MyVoiceNotes {
                     }
                 }
             }
-            if (cancelled[0]) {
-                return;
-            }
             if (transcript.trim().isEmpty()) {
-                AndroidUtilities.runOnUIThread(() -> {
-                    progress.dismiss();
-                    BulletinFactory.of(chat).createErrorBulletin("🤷 לא הצלחתי לשמוע כלום.").show();
-                });
+                finish(message, progress, null, "🤷 לא הצלחתי לשמוע כלום.");
                 return;
             }
             String finalTranscript = transcript;
@@ -365,6 +516,7 @@ public class MyVoiceNotes {
             }
             Note note = new Note();
             note.transcript = transcript;
+            note.forward = forwardName(message);
             String tone = analysis.optString("tone", analysis.optString("טון", ""));
             note.tone = tone.isEmpty() ? "—" : tone;
             JSONArray sections = analysis.optJSONArray("sections");
@@ -381,24 +533,10 @@ public class MyVoiceNotes {
                 }
             }
             note.save(cacheKey(message));
-            if (cancelled[0]) {
-                return;
-            }
-            AndroidUtilities.runOnUIThread(() -> {
-                progress.dismiss();
-                if (LaunchActivity.getSafeLastFragment() == chat) {
-                    showNote(chat, message, note); // otherwise it's cached: the next tap shows it
-                }
-            });
+            finish(message, progress, note, null);
         } catch (Exception e) {
             FileLog.e(e);
-            String error = TextUtils.isEmpty(e.getMessage()) ? e.toString() : e.getMessage();
-            AndroidUtilities.runOnUIThread(() -> {
-                progress.dismiss();
-                if (!cancelled[0]) {
-                    BulletinFactory.of(chat).createErrorBulletin("❌ " + error).show();
-                }
-            });
+            finish(message, progress, null, "❌ " + (TextUtils.isEmpty(e.getMessage()) ? e.toString() : e.getMessage()));
         } finally {
             if (audio != null) {
                 audio.cleanup();
@@ -603,7 +741,7 @@ public class MyVoiceNotes {
 
     // ---- Download, transcript in the bubble ----
 
-    private static void withFile(ChatActivity chat, MessageObject message, Job progress, boolean[] cancelled, Utilities.Callback<File> then) {
+    private static void withFile(MessageObject message, Job progress, Utilities.Callback<File> then) {
         File file = localFile(message);
         if (file != null) {
             then.run(file);
@@ -620,13 +758,9 @@ public class MyVoiceNotes {
             }
             center.removeObserver(observer[0], NotificationCenter.fileLoaded);
             center.removeObserver(observer[0], NotificationCenter.fileLoadFailed);
-            if (cancelled[0]) {
-                return;
-            }
             File loaded = id == NotificationCenter.fileLoaded ? localFile(message) : null;
             if (loaded == null) {
-                progress.dismiss();
-                BulletinFactory.of(chat).createErrorBulletin("❌ קובץ האודיו לא נמצא.").show();
+                finish(message, progress, null, "❌ קובץ האודיו לא נמצא.");
                 return;
             }
             then.run(loaded);
@@ -688,7 +822,7 @@ public class MyVoiceNotes {
 
     private static CharSequence replyText(MessageObject message, Note note) {
         SpannableStringBuilder out = new SpannableStringBuilder();
-        String forward = forwardName(message);
+        String forward = !note.forward.isEmpty() || message == null ? note.forward : forwardName(message);
         if (!forward.isEmpty()) {
             bold(out, "📨 מועבר מ:");
             out.append(" ").append(forward).append("\n");
