@@ -138,17 +138,24 @@ public class MyVoiceNotes {
         return true;
     }
 
-    // A note being processed in the background; its button spins until dismiss().
+    // A note being processed in the background; its button spins until dismiss(), and its stage shows in the
+    // service's progress notification.
     private static class Job {
         final long docId;
+        final String chatTitle;
+        String stage = "⏳ מתחיל...";
+        int percent;
         java.lang.ref.WeakReference<View> cell = new java.lang.ref.WeakReference<>(null);
 
-        Job(long docId) {
+        Job(long docId, String chatTitle) {
             this.docId = docId;
+            this.chatTitle = chatTitle;
         }
 
-        void setMessage(String text) {
-            // No dialog: the spinning button is the progress.
+        void setMessage(String text, int percent) {
+            stage = text;
+            this.percent = percent;
+            WorkService.refresh();
         }
 
         void dismiss() {
@@ -245,7 +252,7 @@ public class MyVoiceNotes {
     // In the background, kept alive by a foreground service even after leaving the app: the button spins until
     // it's done, then the summary pops up if you're still in that chat, or a notification opens it.
     private static void run(MessageObject message) {
-        Job progress = new Job(message.getDocument().id);
+        Job progress = new Job(message.getDocument().id, AiSummarizer.chatTitle(message.currentAccount, message.getDialogId()));
         running.put(progress.docId, progress);
         WorkService.update();
         withFile(message, progress, file -> Utilities.globalQueue.postRunnable(() -> process(message, file, progress)));
@@ -317,16 +324,39 @@ public class MyVoiceNotes {
             }
         }
 
+        // The ongoing notification: one note's chat, stage and progress bar, or a line per note.
+        static Notification build(Context context) {
+            NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_WORK)
+                .setSmallIcon(MyIcons.notificationIcon())
+                .setOnlyAlertOnce(true)
+                .setOngoing(true);
+            if (running.size() == 1) {
+                Job job = running.values().iterator().next();
+                builder.setContentTitle("Summarizing a voice message" + (TextUtils.isEmpty(job.chatTitle) ? "" : " · " + job.chatTitle))
+                    .setContentText(job.stage)
+                    .setProgress(100, job.percent, job.percent <= 0);
+            } else {
+                NotificationCompat.InboxStyle lines = new NotificationCompat.InboxStyle();
+                for (Job job : running.values()) {
+                    lines.addLine((TextUtils.isEmpty(job.chatTitle) ? "" : job.chatTitle + ": ") + job.stage);
+                }
+                builder.setContentTitle("Summarizing " + Math.max(1, running.size()) + " voice messages")
+                    .setStyle(lines)
+                    .setProgress(0, 0, true);
+            }
+            return builder.build();
+        }
+
+        static void refresh() {
+            if (!running.isEmpty()) {
+                notificationManager().notify(WORK_NOTIFICATION_ID, build(ApplicationLoader.applicationContext));
+            }
+        }
+
         @Override
         public int onStartCommand(Intent intent, int flags, int startId) {
-            int count = Math.max(1, running.size());
-            Notification notification = new NotificationCompat.Builder(this, CHANNEL_WORK)
-                .setSmallIcon(MyIcons.notificationIcon())
-                .setContentTitle(count == 1 ? "Summarizing a voice message…" : "Summarizing " + count + " voice messages…")
-                .setProgress(0, 0, true)
-                .setOngoing(true)
-                .build();
             notificationManager();
+            Notification notification = build(this);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 startForeground(WORK_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
             } else {
@@ -441,7 +471,7 @@ public class MyVoiceNotes {
         File work = new File(ApplicationLoader.applicationContext.getCacheDir(), "voicenote_" + System.currentTimeMillis());
         MyAudioChunker audio = null;
         try {
-            setProgress(progress, "🎙️ מתמלל...");
+            setProgress(progress, "🎙️ מתמלל...", 15);
             String transcript;
             double duration = 0;
             try {
@@ -468,7 +498,8 @@ public class MyVoiceNotes {
                                 FileLog.e(ce);
                                 parts[index] = CHUNK_FAILED;
                             }
-                            setProgress(progress, "🎙️ מתמלל " + done.incrementAndGet() + "/" + total + "...");
+                            int finished = done.incrementAndGet();
+                            setProgress(progress, "🎙️ מתמלל " + finished + "/" + total + "...", 15 + 60 * finished / total);
                         }));
                     }
                     for (Future<?> f : futures) {
@@ -505,7 +536,7 @@ public class MyVoiceNotes {
             }
             String finalTranscript = transcript;
             AndroidUtilities.runOnUIThread(() -> applyTranscript(message, finalTranscript)); // visible in the bubble while summarizing
-            setProgress(progress, "✍️ מסכם...");
+            setProgress(progress, "✍️ מסכם...", 80);
 
             JSONObject analysis;
             try {
@@ -546,8 +577,8 @@ public class MyVoiceNotes {
         }
     }
 
-    private static void setProgress(Job progress, String text) {
-        AndroidUtilities.runOnUIThread(() -> progress.setMessage(text));
+    private static void setProgress(Job progress, String text, int percent) {
+        AndroidUtilities.runOnUIThread(() -> progress.setMessage(text, percent));
     }
 
     // The bot's prompt, word for word: names list (when set) and the gap note when a chunk failed.
@@ -747,7 +778,7 @@ public class MyVoiceNotes {
             then.run(file);
             return;
         }
-        progress.setMessage("Downloading…");
+        progress.setMessage("⬇️ מוריד...", 5);
         int account = message.currentAccount;
         String name = message.getFileName();
         NotificationCenter center = NotificationCenter.getInstance(account);
