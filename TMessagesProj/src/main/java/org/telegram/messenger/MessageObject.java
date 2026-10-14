@@ -7605,7 +7605,8 @@ public class MessageObject {
             (isVoice() || isRoundVideo() && TranscribeButton.isVideoTranscriptionOpen(this)) &&
             messageOwner.voiceTranscriptionOpen &&
             messageOwner.voiceTranscription != null &&
-            (messageOwner.voiceTranscriptionFinal || TranscribeButton.isTranscribing(this))
+            (messageOwner.voiceTranscriptionFinal || TranscribeButton.isTranscribing(this)) &&
+            org.telegram.ui.MyVoiceNotes.showTranscript(this)
         );
     }
 

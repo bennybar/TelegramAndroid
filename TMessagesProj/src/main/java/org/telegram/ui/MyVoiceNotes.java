@@ -817,8 +817,22 @@ public class MyVoiceNotes {
         return path != null && path.exists() ? path : null;
     }
 
+    // Where each transcript was last shown: it stays under the voice message only in that chat screen.
+    private static final java.util.HashMap<Long, java.lang.ref.WeakReference<org.telegram.ui.ActionBar.BaseFragment>> shownIn = new java.util.HashMap<>();
+
+    // MessageObject.isVoiceTranscriptionOpen hook: our notes show the transcript only in the chat screen where it was
+    // just made or opened, so reopening the chat (or the app) shows just the voice message.
+    public static boolean showTranscript(MessageObject message) {
+        if (message.getDocument() == null || !useButton(message)) {
+            return true;
+        }
+        java.lang.ref.WeakReference<org.telegram.ui.ActionBar.BaseFragment> ref = shownIn.get(message.getDocument().id);
+        return ref != null && ref.get() != null && ref.get() == LaunchActivity.getSafeLastFragment();
+    }
+
     // Fills Telegram's transcription spot under the voice message, locally (like the fork's offline transcription).
     private static void applyTranscript(MessageObject message, String transcript) {
+        shownIn.put(message.getDocument().id, new java.lang.ref.WeakReference<>(LaunchActivity.getSafeLastFragment()));
         if (message.messageOwner == null || transcript.equals(message.messageOwner.voiceTranscription) && message.messageOwner.voiceTranscriptionOpen) {
             return;
         }
