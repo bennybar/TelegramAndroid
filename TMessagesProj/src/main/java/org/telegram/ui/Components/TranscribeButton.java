@@ -207,7 +207,7 @@ public class TranscribeButton {
         if (parent == null) {
             return;
         }
-        if (!shouldBeOpen && org.telegram.ui.MyVoiceNotes.onButtonTap(parent.getMessageObject())) {
+        if (!shouldBeOpen && org.telegram.ui.MyVoiceNotes.onButtonTap(parent)) {
             pressed = false; // Tegram: transcribe & summarize with the user's OpenAI key (MyVoiceNotes)
             return;
         }
