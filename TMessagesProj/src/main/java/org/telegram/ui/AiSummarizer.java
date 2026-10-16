@@ -206,6 +206,9 @@ public class AiSummarizer {
 
     // Per-chat fetch cap: in a digest, the post budget shared across the chats.
     private int capPerChat() {
+        if (maxPerChat > 0) {
+            return maxPerChat;
+        }
         return digestWindow == null ? MAX_MESSAGES_PER_CHAT : Math.max(20, (DIGEST_MAX_POSTS + dialogIds.size() - 1) / dialogIds.size());
     }
 
@@ -288,7 +291,7 @@ public class AiSummarizer {
     }
 
     // The collected messages as one text, oldest to newest per chat, keeping the newest maxChars
-    // (MyShopping reads it with its own prompt instead of send()).
+    // (MyLists reads it with its own prompt instead of send()).
     public String transcript(int maxChars) {
         StringBuilder all = new StringBuilder();
         for (StringBuilder text : chatTexts) {
@@ -297,6 +300,13 @@ public class AiSummarizer {
             }
         }
         return all.length() > maxChars ? all.substring(all.length() - maxChars) : all.toString();
+    }
+
+    // At most this many of the newest messages per chat (the muted-groups catch-up); older ones set truncated.
+    private int maxPerChat;
+
+    public void setMaxPerChat(int max) {
+        maxPerChat = max;
     }
 
     // Only collect messages newer than this id (e.g. the chat's last read message).
@@ -431,7 +441,7 @@ public class AiSummarizer {
         String digestText = message.message == null ? "" : message.message.trim().replace('\n', ' ');
         entries.add(new Entry(message.date, chatTitle(account, did), "[r" + refs.size() + "]", digestText,
             message.grouped_id, !hasWords(digestText)));
-        String time = new SimpleDateFormat("EEE HH:mm", Locale.US).format(new Date(message.date * 1000L));
+        String time = new SimpleDateFormat("EEE dd/MM HH:mm", Locale.US).format(new Date(message.date * 1000L));
         return "[r" + refs.size() + "] " + time + " " + senderName(message) + (message.mentioned ? " (mentions Me)" : "") + ": " + body.replace('\n', ' ');
     }
 
