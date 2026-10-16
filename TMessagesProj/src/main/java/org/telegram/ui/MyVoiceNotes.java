@@ -1,16 +1,12 @@
 package org.telegram.ui;
 
 import android.app.Activity;
-import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
-import android.app.Service;
 import android.content.Intent;
-import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.IBinder;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Canvas;
@@ -154,11 +150,12 @@ public class MyVoiceNotes {
         void setMessage(String text, int percent) {
             stage = text;
             this.percent = percent;
-            WorkService.refresh();
+            MyWorkService.put("voice" + docId, "Summarizing a voice message" + (TextUtils.isEmpty(chatTitle) ? "" : " · " + chatTitle), stage, percent);
         }
 
         void dismiss() {
             running.remove(docId);
+            MyWorkService.remove("voice" + docId);
             View view = cell.get();
             if (view != null) {
                 view.invalidate();
@@ -253,7 +250,7 @@ public class MyVoiceNotes {
         Job progress = new Job(message.getDocument().id, AiSummarizer.chatTitle(message.currentAccount, message.getDialogId()));
         running.put(progress.docId, progress);
         cell.invalidate(); // start spinning now, not on the cell's next redraw
-        WorkService.update();
+        progress.setMessage(progress.stage, 0);
         withFile(message, progress, file -> Utilities.globalQueue.postRunnable(() -> process(message, file, progress)));
     }
 
@@ -270,7 +267,6 @@ public class MyVoiceNotes {
     private static void finish(MessageObject message, Job progress, Note note, String error) {
         AndroidUtilities.runOnUIThread(() -> {
             progress.dismiss();
-            WorkService.update();
             ChatActivity chat = visibleChat(message);
             if (chat != null && note != null) {
                 showNote(chat, message, note);
@@ -289,88 +285,15 @@ public class MyVoiceNotes {
 
     // ---- Background: the foreground service and the "done" notification ----
 
-    private static final String CHANNEL_WORK = "my_voice_work";
     private static final String CHANNEL_DONE = "my_voice_done";
     private static final String ACTION_OPEN = "org.telegram.ui.MyVoiceNotes.OPEN";
-    private static final int WORK_NOTIFICATION_ID = 0x7E7F00;
 
     private static NotificationManager notificationManager() {
-        Context context = ApplicationLoader.applicationContext;
-        NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        NotificationManager manager = MyWorkService.notificationManager();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            manager.createNotificationChannel(new NotificationChannel(CHANNEL_WORK, "Voice summaries in progress", NotificationManager.IMPORTANCE_LOW));
             manager.createNotificationChannel(new NotificationChannel(CHANNEL_DONE, "Voice summaries", NotificationManager.IMPORTANCE_HIGH));
         }
         return manager;
-    }
-
-    // Keeps the process alive while notes are being processed; started from a tap, so the app is in the foreground.
-    public static class WorkService extends Service {
-
-        static void update() {
-            Context context = ApplicationLoader.applicationContext;
-            Intent intent = new Intent(context, WorkService.class);
-            try {
-                if (running.isEmpty()) {
-                    context.stopService(intent);
-                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(intent);
-                } else {
-                    context.startService(intent);
-                }
-            } catch (Exception e) {
-                FileLog.e(e); // still runs while the app stays open
-            }
-        }
-
-        // The ongoing notification: one note's chat, stage and progress bar, or a line per note.
-        static Notification build(Context context) {
-            NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_WORK)
-                .setSmallIcon(MyIcons.notificationIcon())
-                .setOnlyAlertOnce(true)
-                .setOngoing(true);
-            if (running.size() == 1) {
-                Job job = running.values().iterator().next();
-                builder.setContentTitle("Summarizing a voice message" + (TextUtils.isEmpty(job.chatTitle) ? "" : " · " + job.chatTitle))
-                    .setContentText(job.stage)
-                    .setProgress(100, job.percent, job.percent <= 0);
-            } else {
-                NotificationCompat.InboxStyle lines = new NotificationCompat.InboxStyle();
-                for (Job job : running.values()) {
-                    lines.addLine((TextUtils.isEmpty(job.chatTitle) ? "" : job.chatTitle + ": ") + job.stage);
-                }
-                builder.setContentTitle("Summarizing " + Math.max(1, running.size()) + " voice messages")
-                    .setStyle(lines)
-                    .setProgress(0, 0, true);
-            }
-            return builder.build();
-        }
-
-        static void refresh() {
-            if (!running.isEmpty()) {
-                notificationManager().notify(WORK_NOTIFICATION_ID, build(ApplicationLoader.applicationContext));
-            }
-        }
-
-        @Override
-        public int onStartCommand(Intent intent, int flags, int startId) {
-            notificationManager();
-            Notification notification = build(this);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(WORK_NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
-            } else {
-                startForeground(WORK_NOTIFICATION_ID, notification);
-            }
-            if (running.isEmpty()) {
-                stopSelf();
-            }
-            return START_NOT_STICKY;
-        }
-
-        @Override
-        public IBinder onBind(Intent intent) {
-            return null;
-        }
     }
 
     private static void notifyDone(MessageObject message, Note note, String error) {
@@ -393,7 +316,7 @@ public class MyVoiceNotes {
             .setStyle(new NotificationCompat.BigTextStyle().bigText(text))
             .setAutoCancel(true)
             .setContentIntent(PendingIntent.getActivity(context, (int) docId, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT));
-        notificationManager().notify(WORK_NOTIFICATION_ID + 1 + (int) (docId & 0xFFFF), builder.build());
+        notificationManager().notify(0x7E7F01 + (int) (docId & 0xFFFF), builder.build());
     }
 
     // LaunchActivity hook: the notification opens the chat at the voice message, then its summary.

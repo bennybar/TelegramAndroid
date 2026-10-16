@@ -1,44 +1,54 @@
 package org.telegram.ui;
 
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Paint;
+import android.graphics.Rect;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
-import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
+
+import androidx.core.app.NotificationCompat;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.R;
+import org.telegram.messenger.UserConfig;
 import org.telegram.tgnet.ConnectionsManager;
-import org.telegram.ui.ActionBar.ActionBar;
-import org.telegram.ui.ActionBar.ActionBarMenuItem;
 import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.CheckBox2;
 import org.telegram.ui.Components.LayoutHelper;
-import org.telegram.ui.Components.UItem;
-import org.telegram.ui.Components.UniversalAdapter;
-import org.telegram.ui.Components.UniversalRecyclerView;
 
 import java.util.ArrayList;
 import java.util.Locale;
 
-// Shopping list, a card in the AI (Digest) tab: one chosen chat's last 1-5 days are read with the Digest's paced
-// history requests, the model picks out what someone asked to buy, and the items are merged into a checklist kept
-// on this phone (new items added, ones already listed skipped, checkmarks kept). Each item links to its message.
+// The Shopping page of the AI tab: one chosen chat's last 1-5 days are read with the Digest's paced history
+// requests, the model picks out what someone asked to buy, and the items are merged into a checklist kept on this
+// phone (new items added, ones already listed skipped, checkmarks kept). Each item links to its message.
+// The scan runs in the background (MyWorkService) with a progress notification; when it ends away from this page,
+// a notification opens the list.
 public class MyShopping {
 
     private static final int[] DAYS = {1, 2, 3, 4, 5};
     private static final int MAX_CHARS = 100_000;
+    private static final String CHANNEL_DONE = "my_shop_done";
+    private static final String ACTION_OPEN = "org.telegram.ui.MyShopping.OPEN";
+    private static final int NOTIFICATION_ID = 0x7E7E00;
 
     private static final String PROMPT =
         "You find shopping requests in a Telegram chat: things someone asks to buy, adds to a grocery or shopping " +
@@ -104,100 +114,278 @@ public class MyShopping {
         return AiSummarizer.prefs().getInt("shopDays", 2);
     }
 
-    // ---- The card in the AI tab ----
+    // ---- Scan state, shared by the page and the background run ----
 
-    public static View createCard(BaseFragment fragment, Runnable refresh) {
-        Context context = fragment.getContext();
-        LinearLayout card = new LinearLayout(context);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
-        card.setPadding(AndroidUtilities.dp(21), AndroidUtilities.dp(16), AndroidUtilities.dp(21), AndroidUtilities.dp(16));
+    private static boolean scanning;
+    private static String scanStage = "";
+    private static Page page; // the page on screen, if any
 
-        TextView label = new TextView(context);
-        label.setText("SHOPPING LIST");
-        label.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 11);
-        label.setLetterSpacing(0.04f);
-        label.setTypeface(AndroidUtilities.bold());
-        label.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
-        card.addView(label);
+    public static boolean isScanning() {
+        return scanning;
+    }
 
-        long did = chat();
-        TextView chatView = new TextView(context);
-        chatView.setText(did == 0 ? "Choose a chat ›" : "From " + AiSummarizer.chatTitle(fragment.getCurrentAccount(), did) + " ›");
-        chatView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 17);
-        chatView.setTypeface(AndroidUtilities.bold());
-        chatView.setTextColor(Theme.getColor(did == 0 ? Theme.key_windowBackgroundWhiteBlueText : Theme.key_windowBackgroundWhiteBlackText));
-        chatView.setPadding(0, AndroidUtilities.dp(6), 0, AndroidUtilities.dp(10));
-        chatView.setOnClickListener(v -> pickChat(fragment, refresh));
-        card.addView(chatView);
-
-        // Days: "Last  1 2 3 4 5  days", the chosen one filled.
-        LinearLayout daysRow = new LinearLayout(context);
-        daysRow.setOrientation(LinearLayout.HORIZONTAL);
-        daysRow.setGravity(Gravity.CENTER_VERTICAL);
-        daysRow.addView(smallText(context, "Last"), LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 0, 10, 0));
-        int accent = Theme.getColor(Theme.key_featuredStickers_addButton);
-        for (int d : DAYS) {
-            TextView chip = new TextView(context);
-            chip.setText(String.valueOf(d));
-            chip.setGravity(Gravity.CENTER);
-            chip.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-            chip.setTypeface(AndroidUtilities.bold());
-            chip.setIncludeFontPadding(false);
-            boolean selected = d == days();
-            chip.setTextColor(selected ? Theme.getColor(Theme.key_featuredStickers_buttonText) : accent);
-            chip.setBackground(Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(17), selected ? accent : Theme.multAlpha(accent, 0.1f), Theme.multAlpha(accent, 0.25f)));
-            chip.setOnClickListener(v -> {
-                AiSummarizer.prefs().edit().putInt("shopDays", d).apply();
-                refresh.run();
-            });
-            daysRow.addView(chip, LayoutHelper.createLinear(34, 34, 0, 0, 6, 0));
+    private static void changed() {
+        if (page != null) {
+            page.rebuild();
         }
-        daysRow.addView(smallText(context, days() == 1 ? "day" : "days"), LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 4, 0, 0, 0));
-        card.addView(daysRow);
+    }
 
-        ArrayList<Item> items = load();
-        int checked = 0;
-        for (Item item : items) {
-            if (item.checked) {
-                checked++;
+    // ---- The page ----
+
+    // Built by AiSummaryActivity for its Shopping tab: the scan settings, then the checklist.
+    public static class Page extends ScrollView {
+
+        private final BaseFragment fragment;
+        private final LinearLayout content;
+        private final Runnable onScanStateChanged;
+
+        public Page(BaseFragment fragment, Runnable onScanStateChanged) {
+            super(fragment.getContext());
+            this.fragment = fragment;
+            this.onScanStateChanged = onScanStateChanged;
+            content = new LinearLayout(getContext());
+            content.setOrientation(LinearLayout.VERTICAL);
+            addView(content);
+            setClipToPadding(false);
+            rebuild();
+        }
+
+        @Override
+        protected void onAttachedToWindow() {
+            super.onAttachedToWindow();
+            page = this;
+            rebuild();
+        }
+
+        @Override
+        protected void onDetachedFromWindow() {
+            super.onDetachedFromWindow();
+            if (page == this) {
+                page = null;
             }
         }
-        TextView status = smallText(context, items.isEmpty() ? "Nothing on the list yet." :
-            items.size() + (items.size() == 1 ? " item" : " items") + (checked > 0 ? " · " + checked + " checked" : ""));
-        status.setPadding(0, AndroidUtilities.dp(12), 0, AndroidUtilities.dp(12));
-        card.addView(status);
 
-        LinearLayout buttons = new LinearLayout(context);
-        buttons.setOrientation(LinearLayout.HORIZONTAL);
-        TextView scan = AiSummaryActivity.primaryButton(context, "Scan for items");
-        scan.setOnClickListener(v -> scan(fragment, refresh));
-        buttons.addView(scan, LayoutHelper.createLinear(0, 44, 1f));
-        if (!items.isEmpty()) {
-            TextView open = new TextView(context);
-            open.setText("Open list");
-            open.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
-            open.setTypeface(AndroidUtilities.bold());
-            open.setGravity(Gravity.CENTER);
-            open.setIncludeFontPadding(false);
-            open.setTextColor(accent);
-            open.setBackground(Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(10), Theme.multAlpha(accent, 0.1f), Theme.multAlpha(accent, 0.2f)));
-            open.setOnClickListener(v -> fragment.presentFragment(new ListActivity()));
-            buttons.addView(open, LayoutHelper.createLinear(0, 44, 1f, 10, 0, 0, 0));
+        // On screen right now: attached, visible and not scrolled away by the tab pager.
+        boolean isOnScreen() {
+            return isShown() && !ApplicationLoader.mainInterfacePaused && getGlobalVisibleRect(new Rect());
         }
-        card.addView(buttons);
-        return card;
+
+        void rebuild() {
+            Context context = getContext();
+            content.removeAllViews();
+            content.addView(createSettingsCard(context));
+            content.addView(hint(context, "Reads one chat and lists what someone asked to buy. Secret chats are never sent."));
+            ArrayList<Item> items = load();
+            int open = 0;
+            for (Item item : items) {
+                if (!item.checked) {
+                    open++;
+                }
+            }
+            if (items.isEmpty()) {
+                content.addView(hint(context, "The list is empty. Scan to fill it."));
+            } else {
+                LinearLayout list = card(context);
+                list.addView(header(context, "TO BUY · " + open, null, null));
+                for (Item item : items) {
+                    if (!item.checked) {
+                        list.addView(row(context, items, item));
+                    }
+                }
+                if (open == 0) {
+                    list.addView(hint(context, "Everything's checked off."));
+                }
+                if (open < items.size()) {
+                    list.addView(header(context, "CHECKED · " + (items.size() - open), "Clear", () -> {
+                        for (int i = items.size() - 1; i >= 0; i--) {
+                            if (items.get(i).checked) {
+                                items.remove(i);
+                            }
+                        }
+                        save(items);
+                        rebuild();
+                    }));
+                    for (Item item : items) {
+                        if (item.checked) {
+                            list.addView(row(context, items, item));
+                        }
+                    }
+                }
+                content.addView(list);
+                content.addView(hint(context, "Tap an item to check it off. Long-press to open the message it came from."));
+                TextView clearAll = new TextView(context);
+                clearAll.setText("Clear the whole list");
+                clearAll.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+                clearAll.setTextColor(Theme.getColor(Theme.key_text_RedRegular));
+                clearAll.setPadding(AndroidUtilities.dp(21), AndroidUtilities.dp(4), AndroidUtilities.dp(21), AndroidUtilities.dp(16));
+                clearAll.setOnClickListener(v -> {
+                    AlertDialog.Builder builder = new AlertDialog.Builder(context);
+                    builder.setTitle("Clear the shopping list?");
+                    builder.setMessage("All " + items.size() + " items will be removed.");
+                    builder.setPositiveButton("Clear", (d, w) -> {
+                        save(new ArrayList<>());
+                        rebuild();
+                    });
+                    builder.setNegativeButton("Cancel", null);
+                    fragment.showDialog(builder.create());
+                });
+                content.addView(clearAll);
+            }
+            onScanStateChanged.run();
+        }
+
+        private LinearLayout card(Context context) {
+            LinearLayout card = new LinearLayout(context);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+            return card;
+        }
+
+        // Chat, days and the scan's status.
+        private View createSettingsCard(Context context) {
+            LinearLayout card = card(context);
+            card.setPadding(AndroidUtilities.dp(21), AndroidUtilities.dp(16), AndroidUtilities.dp(21), AndroidUtilities.dp(16));
+            card.addView(label(context, "SCAN"));
+
+            long did = chat();
+            TextView chatView = new TextView(context);
+            chatView.setText(did == 0 ? "Choose a chat ›" : "From " + AiSummarizer.chatTitle(fragment.getCurrentAccount(), did) + " ›");
+            chatView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 17);
+            chatView.setTypeface(AndroidUtilities.bold());
+            chatView.setTextColor(Theme.getColor(did == 0 ? Theme.key_windowBackgroundWhiteBlueText : Theme.key_windowBackgroundWhiteBlackText));
+            chatView.setPadding(0, AndroidUtilities.dp(8), 0, AndroidUtilities.dp(12));
+            chatView.setOnClickListener(v -> pickChat(fragment));
+            card.addView(chatView);
+
+            // "Last  1 2 3 4 5  days", the chosen one filled.
+            LinearLayout daysRow = new LinearLayout(context);
+            daysRow.setOrientation(LinearLayout.HORIZONTAL);
+            daysRow.setGravity(Gravity.CENTER_VERTICAL);
+            daysRow.addView(gray(context, "Last"), LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 0, 0, 10, 0));
+            int accent = Theme.getColor(Theme.key_featuredStickers_addButton);
+            for (int d : DAYS) {
+                TextView chip = new TextView(context);
+                chip.setText(String.valueOf(d));
+                chip.setGravity(Gravity.CENTER);
+                chip.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+                chip.setTypeface(AndroidUtilities.bold());
+                chip.setIncludeFontPadding(false);
+                boolean selected = d == days();
+                chip.setTextColor(selected ? Theme.getColor(Theme.key_featuredStickers_buttonText) : accent);
+                chip.setBackground(Theme.createSimpleSelectorRoundRectDrawable(AndroidUtilities.dp(18), selected ? accent : Theme.multAlpha(accent, 0.1f), Theme.multAlpha(accent, 0.25f)));
+                chip.setOnClickListener(v -> {
+                    AiSummarizer.prefs().edit().putInt("shopDays", d).apply();
+                    rebuild();
+                });
+                daysRow.addView(chip, LayoutHelper.createLinear(36, 36, 0, 0, 6, 0));
+            }
+            daysRow.addView(gray(context, days() == 1 ? "day" : "days"), LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 4, 0, 0, 0));
+            card.addView(daysRow);
+
+            String status;
+            if (scanning) {
+                status = scanStage;
+            } else {
+                long last = AiSummarizer.prefs().getLong("shopLastScan", 0);
+                status = last == 0 ? "Not scanned yet." : "Last scan " + AiSummaryActivity.whenText(last) + " · " + AiSummarizer.prefs().getString("shopLastResult", "");
+            }
+            TextView statusView = gray(context, status);
+            statusView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+            statusView.setPadding(0, AndroidUtilities.dp(14), 0, 0);
+            card.addView(statusView);
+            return card;
+        }
+
+        private View header(Context context, String text, String action, Runnable onAction) {
+            LinearLayout row = new LinearLayout(context);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(AndroidUtilities.dp(21), AndroidUtilities.dp(14), AndroidUtilities.dp(21), AndroidUtilities.dp(4));
+            row.addView(label(context, text), LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f));
+            if (action != null) {
+                TextView button = new TextView(context);
+                button.setText(action);
+                button.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+                button.setTypeface(AndroidUtilities.bold());
+                button.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueText));
+                button.setPadding(AndroidUtilities.dp(8), AndroidUtilities.dp(4), 0, AndroidUtilities.dp(4));
+                button.setOnClickListener(v -> onAction.run());
+                row.addView(button);
+            }
+            return row;
+        }
+
+        // An item: round checkbox, name and quantity, right to left for Hebrew; checked items struck through.
+        private View row(Context context, ArrayList<Item> items, Item item) {
+            boolean rtl = (item.name + item.qty).matches("(?s).*[\\u0590-\\u05FF].*");
+            LinearLayout row = new LinearLayout(context);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setLayoutDirection(rtl ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
+            row.setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_listSelector), Theme.RIPPLE_MASK_ALL));
+            row.setPadding(AndroidUtilities.dp(21), AndroidUtilities.dp(12), AndroidUtilities.dp(21), AndroidUtilities.dp(12));
+
+            CheckBox2 check = new CheckBox2(context, 22);
+            check.setColor(Theme.key_checkbox, Theme.key_radioBackground, Theme.key_checkboxCheck);
+            check.setDrawUnchecked(true);
+            check.setDrawBackgroundAsArc(10);
+            check.setChecked(item.checked, false);
+            check.setClickable(false);
+            row.addView(check, LayoutHelper.createLinear(24, 24));
+
+            TextView name = new TextView(context);
+            name.setText(item.qty.isEmpty() ? item.name : item.name + "  ·  " + item.qty);
+            name.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+            name.setTextDirection(rtl ? View.TEXT_DIRECTION_RTL : View.TEXT_DIRECTION_LTR);
+            name.setTextColor(Theme.getColor(item.checked ? Theme.key_windowBackgroundWhiteGrayText : Theme.key_windowBackgroundWhiteBlackText));
+            if (item.checked) {
+                name.setPaintFlags(name.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
+            }
+            row.addView(name, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f, 16, 0, 0, 0));
+
+            row.setOnClickListener(v -> {
+                item.checked = !item.checked;
+                save(items);
+                rebuild();
+            });
+            row.setOnLongClickListener(v -> {
+                if (item.dialogId == 0 || item.messageId == 0) {
+                    BulletinFactory.of(fragment).createErrorBulletin("No source message for this item.").show();
+                } else {
+                    AiSummaryActivity.openMessage(fragment, new AiSummarizer.Ref(item.dialogId, item.messageId));
+                }
+                return true;
+            });
+            return row;
+        }
+
+        private TextView label(Context context, String text) {
+            TextView label = new TextView(context);
+            label.setText(text);
+            label.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 11);
+            label.setLetterSpacing(0.04f);
+            label.setTypeface(AndroidUtilities.bold());
+            label.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+            return label;
+        }
+
+        private TextView gray(Context context, String text) {
+            TextView view = new TextView(context);
+            view.setText(text);
+            view.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+            view.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+            return view;
+        }
+
+        private TextView hint(Context context, String text) {
+            TextView view = gray(context, text);
+            view.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 13);
+            view.setPadding(AndroidUtilities.dp(21), AndroidUtilities.dp(10), AndroidUtilities.dp(21), AndroidUtilities.dp(14));
+            return view;
+        }
     }
 
-    private static TextView smallText(Context context, String text) {
-        TextView view = new TextView(context);
-        view.setText(text);
-        view.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-        view.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
-        return view;
-    }
-
-    private static void pickChat(BaseFragment fragment, Runnable refresh) {
+    private static void pickChat(BaseFragment fragment) {
         Bundle args = new Bundle();
         args.putBoolean("onlySelect", true);
         args.putBoolean("checkCanWrite", false);
@@ -210,75 +398,58 @@ public class MyShopping {
             }
             AiSummarizer.prefs().edit().putLong("shopChat", did).apply();
             f.finishFragment();
-            refresh.run();
+            changed();
             return true;
         });
         fragment.presentFragment(picker);
     }
 
-    // ---- Scanning ----
+    // ---- Scanning, in the background ----
 
-    private static void scan(BaseFragment fragment, Runnable refresh) {
+    // The Shopping tab's bottom button.
+    public static void scan(BaseFragment fragment) {
+        if (scanning) {
+            return;
+        }
         if (AiSummarizer.prefs().getString("apiKey", "").isEmpty()) {
             BulletinFactory.of(fragment).createErrorBulletin("Set your OpenAI API key first.").show();
             return;
         }
         long did = chat();
         if (did == 0) {
-            pickChat(fragment, refresh);
+            pickChat(fragment);
             return;
         }
-        if (fragment.getParentActivity() == null) {
-            return;
-        }
+        int account = UserConfig.selectedAccount;
         int days = days();
+        String chatTitle = AiSummarizer.chatTitle(account, did);
         ArrayList<Long> chats = new ArrayList<>();
         chats.add(did);
-        int since = ConnectionsManager.getInstance(fragment.getCurrentAccount()).getCurrentTime() - days * 24 * 3600;
-        AlertDialog progress = new AlertDialog(fragment.getParentActivity(), AlertDialog.ALERT_TYPE_SPINNER);
-        progress.setCanCancel(true);
-        progress.setCanceledOnTouchOutside(false);
+        int since = ConnectionsManager.getInstance(account).getCurrentTime() - days * 24 * 3600;
+        scanning = true;
+        stage(chatTitle, "Reading messages…", 0);
         AiSummarizer[] reader = new AiSummarizer[1];
-        boolean[] cancelled = {false};
-        progress.setOnCancelListener(d -> {
-            cancelled[0] = true;
-            reader[0].cancel();
-        });
-        reader[0] = new AiSummarizer(fragment.getCurrentAccount(), chats, since, new AiSummarizer.Callback() {
+        reader[0] = new AiSummarizer(account, chats, since, new AiSummarizer.Callback() {
             @Override
             public void onProgress(String text) {
-                progress.setMessage(text);
+                stage(chatTitle, "Reading messages…", 0);
             }
 
             @Override
             public void onCollected(int chatCount, int messages, int approxTokens) {
                 if (messages == 0) {
-                    progress.dismiss();
-                    BulletinFactory.of(fragment).createErrorBulletin("No messages in the last " + (days == 1 ? "day" : days + " days") + ".").show();
+                    finish(chatTitle, null, "No messages in the last " + (days == 1 ? "day" : days + " days") + ".");
                     return;
                 }
-                progress.setMessage("Finding shopping items…");
+                stage(chatTitle, "Finding shopping items in " + messages + " messages…", 60);
                 AiSummarizer.askOnce(PROMPT, reader[0].transcript(MAX_CHARS), answer -> {
-                    if (cancelled[0]) {
-                        return;
-                    }
-                    progress.dismiss();
-                    int added = merge(answer, reader[0].refs);
-                    refresh.run();
-                    if (added < 0) {
-                        BulletinFactory.of(fragment).createErrorBulletin("Couldn't read the AI's answer. Try again.").show();
-                    } else if (added == 0) {
-                        BulletinFactory.of(fragment).createSimpleBulletin(R.raw.done, "No new shopping items found.").show();
+                    ArrayList<Item> added = merge(answer, reader[0].refs);
+                    if (added == null) {
+                        finish(chatTitle, null, "Couldn't read the AI's answer. Try again.");
                     } else {
-                        BulletinFactory.of(fragment).createSimpleBulletin(R.raw.done, "Added " + added + (added == 1 ? " item." : " items.")).show();
-                        fragment.presentFragment(new ListActivity());
+                        finish(chatTitle, added, null);
                     }
-                }, error -> {
-                    if (!cancelled[0]) {
-                        progress.dismiss();
-                        BulletinFactory.of(fragment).createErrorBulletin("❌ " + error).show();
-                    }
-                });
+                }, error -> finish(chatTitle, null, error));
             }
 
             @Override
@@ -287,30 +458,87 @@ public class MyShopping {
 
             @Override
             public void onError(String error) {
-                progress.dismiss();
-                BulletinFactory.of(fragment).createErrorBulletin("❌ " + error).show();
+                finish(chatTitle, null, error);
             }
         });
-        progress.show();
         reader[0].start();
     }
 
-    // Adds the new items to the saved list (names already on it are skipped, checkmarks kept); -1 if unreadable.
-    private static int merge(String answer, ArrayList<AiSummarizer.Ref> refs) {
+    private static void stage(String chatTitle, String text, int percent) {
+        scanStage = text;
+        MyWorkService.put("shop", "Shopping list · " + chatTitle, text, percent);
+        changed();
+    }
+
+    // The end of a scan: a bulletin on the Shopping page if it's on screen, otherwise a notification.
+    private static void finish(String chatTitle, ArrayList<Item> added, String error) {
+        scanning = false;
+        MyWorkService.remove("shop");
+        String result = error != null ? "failed" : added.isEmpty() ? "nothing new" : added.size() + (added.size() == 1 ? " new item" : " new items");
+        AiSummarizer.prefs().edit().putLong("shopLastScan", System.currentTimeMillis()).putString("shopLastResult", result).apply();
+        Page shown = page;
+        changed();
+        String message = error != null ? "❌ " + error : added.isEmpty() ? "No new shopping items found." : "Added " + added.size() + (added.size() == 1 ? " item." : " items.");
+        if (shown != null && shown.isOnScreen()) {
+            if (error != null) {
+                BulletinFactory.of(shown.fragment).createErrorBulletin(message).show();
+            } else {
+                BulletinFactory.of(shown.fragment).createSimpleBulletin(R.raw.done, message).show();
+            }
+            return;
+        }
+        Context context = ApplicationLoader.applicationContext;
+        NotificationManager manager = MyWorkService.notificationManager();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            manager.createNotificationChannel(new NotificationChannel(CHANNEL_DONE, "Shopping list", NotificationManager.IMPORTANCE_HIGH));
+        }
+        String text = message;
+        if (added != null && !added.isEmpty()) {
+            ArrayList<String> names = new ArrayList<>();
+            for (Item item : added) {
+                names.add(item.name);
+            }
+            text = TextUtils.join(", ", names);
+        }
+        String title = error != null ? "Shopping scan failed" : added.isEmpty() ? "Shopping list: nothing new" : "Shopping list: " + added.size() + (added.size() == 1 ? " new item" : " new items");
+        Intent open = new Intent(context, LaunchActivity.class).setAction(ACTION_OPEN).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_DONE)
+            .setSmallIcon(MyIcons.notificationIcon())
+            .setContentTitle(title + " · " + chatTitle)
+            .setContentText(text)
+            .setStyle(new NotificationCompat.BigTextStyle().bigText(text))
+            .setAutoCancel(true)
+            .setContentIntent(PendingIntent.getActivity(context, NOTIFICATION_ID, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT));
+        manager.notify(NOTIFICATION_ID, builder.build());
+    }
+
+    // LaunchActivity hook: the notification opens the Shopping page.
+    public static boolean handleIntent(LaunchActivity activity, Intent intent) {
+        if (intent == null || !ACTION_OPEN.equals(intent.getAction()) || AndroidUtilities.needShowPasscode(false)) {
+            return false;
+        }
+        Bundle args = new Bundle();
+        args.putInt("page", AiSummaryActivity.PAGE_SHOPPING);
+        AndroidUtilities.runOnUIThread(() -> activity.presentFragment(new AiSummaryActivity(args)), 300);
+        return true;
+    }
+
+    // Adds the new items to the saved list (names already on it are skipped, checkmarks kept); null if unreadable.
+    private static ArrayList<Item> merge(String answer, ArrayList<AiSummarizer.Ref> refs) {
         JSONArray found;
         try {
             int start = answer.indexOf('{');
             int end = answer.lastIndexOf('}');
             found = new JSONObject(answer.substring(start, end + 1)).getJSONArray("items");
         } catch (Exception e) {
-            return -1;
+            return null;
         }
         ArrayList<Item> items = load();
         java.util.HashSet<String> known = new java.util.HashSet<>();
         for (Item item : items) {
             known.add(normalized(item.name));
         }
-        int added = 0;
+        ArrayList<Item> added = new ArrayList<>();
         for (int i = 0; i < found.length(); i++) {
             JSONObject o = found.optJSONObject(i);
             String name = o == null ? "" : o.optString("name", "").trim();
@@ -327,124 +555,9 @@ public class MyShopping {
                 item.messageId = refs.get(index).messageId;
             }
             items.add(item);
-            added++;
+            added.add(item);
         }
         save(items);
         return added;
-    }
-
-    // ---- The checklist ----
-
-    public static class ListActivity extends BaseFragment {
-
-        private static final int MENU_CLEAR_CHECKED = 1;
-        private static final int MENU_CLEAR_ALL = 2;
-
-        private ArrayList<Item> items;
-        private UniversalRecyclerView listView;
-
-        @Override
-        public View createView(Context context) {
-            items = load();
-            actionBar.setBackButtonImage(R.drawable.ic_ab_back);
-            actionBar.setTitle("Shopping list");
-            ActionBarMenuItem other = actionBar.createMenu().addItem(0, R.drawable.ic_ab_other);
-            other.addSubItem(MENU_CLEAR_CHECKED, R.drawable.msg_select, "Clear checked");
-            other.addSubItem(MENU_CLEAR_ALL, R.drawable.msg_delete, "Clear all");
-            actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
-                @Override
-                public void onItemClick(int id) {
-                    if (id == -1) {
-                        finishFragment();
-                    } else if (id == MENU_CLEAR_CHECKED) {
-                        for (int i = items.size() - 1; i >= 0; i--) {
-                            if (items.get(i).checked) {
-                                items.remove(i);
-                            }
-                        }
-                        changed();
-                    } else if (id == MENU_CLEAR_ALL) {
-                        AlertDialog.Builder builder = new AlertDialog.Builder(getParentActivity());
-                        builder.setTitle("Clear the shopping list?");
-                        builder.setMessage("All " + items.size() + " items will be removed.");
-                        builder.setPositiveButton("Clear", (d, w) -> {
-                            items.clear();
-                            changed();
-                        });
-                        builder.setNegativeButton("Cancel", null);
-                        showDialog(builder.create());
-                    }
-                }
-            });
-            FrameLayout frame = new FrameLayout(context);
-            frame.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray));
-            listView = new UniversalRecyclerView(this, this::fillItems, null, null);
-            frame.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
-            fragmentView = frame;
-            return frame;
-        }
-
-        private void changed() {
-            save(items);
-            listView.adapter.update(true);
-        }
-
-        private void fillItems(ArrayList<UItem> out, UniversalAdapter adapter) {
-            if (items.isEmpty()) {
-                out.add(UItem.asShadow("The list is empty. Scan a chat from the AI tab to fill it."));
-                return;
-            }
-            // To buy first, then what's checked off.
-            for (int pass = 0; pass < 2; pass++) {
-                for (Item item : items) {
-                    if (item.checked == (pass == 1)) {
-                        out.add(UItem.asCustom(row(getContext(), item)));
-                    }
-                }
-            }
-            out.add(UItem.asShadow("Tap an item to check it off. Long-press to open the message it came from."));
-        }
-
-        // An item row, right to left for Hebrew: round checkbox, name and quantity; checked items struck through.
-        private View row(Context context, Item item) {
-            boolean rtl = (item.name + item.qty).matches("(?s).*[\\u0590-\\u05FF].*");
-            LinearLayout row = new LinearLayout(context);
-            row.setOrientation(LinearLayout.HORIZONTAL);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setLayoutDirection(rtl ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
-            row.setBackground(Theme.createSelectorWithBackgroundDrawable(Theme.getColor(Theme.key_windowBackgroundWhite), Theme.getColor(Theme.key_listSelector)));
-            row.setPadding(AndroidUtilities.dp(20), AndroidUtilities.dp(12), AndroidUtilities.dp(20), AndroidUtilities.dp(12));
-
-            CheckBox2 check = new CheckBox2(context, 22);
-            check.setColor(Theme.key_checkbox, Theme.key_radioBackground, Theme.key_checkboxCheck);
-            check.setDrawUnchecked(true);
-            check.setDrawBackgroundAsArc(10);
-            check.setChecked(item.checked, false);
-            row.addView(check, LayoutHelper.createLinear(24, 24));
-
-            TextView name = new TextView(context);
-            name.setText(item.qty.isEmpty() ? item.name : item.name + "  ·  " + item.qty);
-            name.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
-            name.setTextDirection(rtl ? View.TEXT_DIRECTION_RTL : View.TEXT_DIRECTION_LTR);
-            name.setTextColor(Theme.getColor(item.checked ? Theme.key_windowBackgroundWhiteGrayText : Theme.key_windowBackgroundWhiteBlackText));
-            if (item.checked) {
-                name.setPaintFlags(name.getPaintFlags() | Paint.STRIKE_THRU_TEXT_FLAG);
-            }
-            row.addView(name, LayoutHelper.createLinear(0, LayoutHelper.WRAP_CONTENT, 1f, 16, 0, 0, 0));
-
-            row.setOnClickListener(v -> {
-                item.checked = !item.checked;
-                changed();
-            });
-            row.setOnLongClickListener(v -> {
-                if (item.dialogId == 0 || item.messageId == 0) {
-                    BulletinFactory.of(this).createErrorBulletin("No source message for this item.").show();
-                } else {
-                    AiSummaryActivity.openMessage(this, new AiSummarizer.Ref(item.dialogId, item.messageId));
-                }
-                return true;
-            });
-            return row;
-        }
     }
 }

@@ -1556,6 +1556,9 @@ public class LaunchActivity extends BasePermissionsActivity implements INavigati
         if (MyVoiceNotes.handleIntent(this, intent)) {
             return true;
         }
+        if (MyShopping.handleIntent(this, intent)) {
+            return true;
+        }
         if (UserSelectorBottomSheet.handleIntent(intent, progress)) {
             return true;
         }

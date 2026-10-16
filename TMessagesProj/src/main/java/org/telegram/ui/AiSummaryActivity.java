@@ -224,6 +224,57 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
     public AiSummaryActivity(Bundle args) {
         super(args);
         hasMainTabs = args != null && args.getBoolean("hasMainTabs", false);
+        if (args != null && args.containsKey("page")) {
+            page = args.getInt("page");
+        }
+    }
+
+    // The two pages, switched by the pill under the top bar.
+    public static final int PAGE_DIGEST = 0;
+    public static final int PAGE_SHOPPING = 1;
+    private static final int SWITCH_DP = 52;
+    private int page = AiSummarizer.prefs().getInt("aiPage", PAGE_DIGEST);
+    private MyShopping.Page shoppingPage;
+    private final TextView[] switchTabs = new TextView[2];
+
+    // A two-segment pill: Digest | Shopping.
+    private View createPageSwitch(Context context) {
+        LinearLayout pill = new LinearLayout(context);
+        pill.setOrientation(LinearLayout.HORIZONTAL);
+        pill.setPadding(AndroidUtilities.dp(3), AndroidUtilities.dp(3), AndroidUtilities.dp(3), AndroidUtilities.dp(3));
+        pill.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(20), Theme.getColor(Theme.key_windowBackgroundWhite)));
+        String[] names = {"✦  Digest", "🛒  Shopping"};
+        for (int i = 0; i < 2; i++) {
+            TextView tab = new TextView(context);
+            tab.setText(names[i]);
+            tab.setGravity(Gravity.CENTER);
+            tab.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+            tab.setTypeface(AndroidUtilities.bold());
+            tab.setIncludeFontPadding(false);
+            int index = i;
+            tab.setOnClickListener(v -> showPage(index));
+            switchTabs[i] = tab;
+            pill.addView(tab, LayoutHelper.createLinear(0, 34, 1f));
+        }
+        FrameLayout wrap = new FrameLayout(context);
+        wrap.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray));
+        wrap.addView(pill, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 40, Gravity.CENTER, 16, 0, 16, 0));
+        return wrap;
+    }
+
+    private void showPage(int index) {
+        page = index;
+        AiSummarizer.prefs().edit().putInt("aiPage", index).apply();
+        int accent = Theme.getColor(Theme.key_featuredStickers_addButton);
+        for (int i = 0; i < 2; i++) {
+            boolean selected = i == index;
+            switchTabs[i].setTextColor(selected ? Theme.getColor(Theme.key_featuredStickers_buttonText) : Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
+            switchTabs[i].setBackground(selected ? Theme.createRoundRectDrawable(AndroidUtilities.dp(17), accent) : null);
+        }
+        listView.setVisibility(index == PAGE_DIGEST ? View.VISIBLE : View.GONE);
+        shoppingPage.setVisibility(index == PAGE_SHOPPING ? View.VISIBLE : View.GONE);
+        actionBar.setTitle(index == PAGE_DIGEST ? "Digest" : "Shopping list");
+        updateSummarizeBar();
     }
 
     @Override
@@ -268,9 +319,17 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         // above the tab bar, so the list leaves room for all three.
         int bottomInset = hasMainTabs ? AndroidUtilities.dp(DialogsActivity.MAIN_TABS_HEIGHT_WITH_MARGINS) + AndroidUtilities.navigationBarHeight : 0;
         int topInset = hasMainTabs ? ActionBar.getCurrentActionBarHeight() + (actionBar.getOccupyStatusBar() ? AndroidUtilities.statusBarHeight : 0) : 0;
-        listView.setPadding(0, topInset, 0, bottomInset + AndroidUtilities.dp(SUMMARIZE_BAR_DP));
+        listView.setPadding(0, topInset + AndroidUtilities.dp(SWITCH_DP), 0, bottomInset + AndroidUtilities.dp(SUMMARIZE_BAR_DP));
         listView.setClipToPadding(false);
         frameLayout.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+
+        shoppingPage = new MyShopping.Page(this, this::updateSummarizeBar);
+        shoppingPage.setPadding(0, topInset + AndroidUtilities.dp(SWITCH_DP), 0, bottomInset + AndroidUtilities.dp(SUMMARIZE_BAR_DP));
+        frameLayout.addView(shoppingPage, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+
+        FrameLayout.LayoutParams switchParams = LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, SWITCH_DP, Gravity.TOP);
+        switchParams.topMargin = topInset;
+        frameLayout.addView(createPageSwitch(context), switchParams);
 
         summarizeBar = new FrameLayout(context);
         summarizeBar.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray));
@@ -280,7 +339,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         FrameLayout.LayoutParams barParams = LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, SUMMARIZE_BAR_DP, Gravity.BOTTOM);
         barParams.bottomMargin = bottomInset;
         frameLayout.addView(summarizeBar, barParams);
-        updateSummarizeBar();
+        showPage(page);
 
         fragmentView = frameLayout;
         return fragmentView;
@@ -292,10 +351,24 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
 
     // The pinned button: Summarize, or "Set OpenAI API key" until there is one.
     private void updateSummarizeBar() {
-        if (summarizeButton == null) {
+        if (summarizeButton == null || shoppingPage == null) {
             return;
         }
         boolean hasKey = !AiSummarizer.prefs().getString("apiKey", "").isEmpty();
+        if (page == PAGE_SHOPPING) {
+            boolean scanning = MyShopping.isScanning();
+            summarizeButton.setText(!hasKey ? "Set OpenAI API key" : scanning ? "Scanning…" : "🛒  Scan for items");
+            summarizeButton.setEnabled(!scanning);
+            summarizeButton.setAlpha(scanning ? 0.5f : 1f);
+            summarizeButton.setOnClickListener(v -> {
+                if (hasKey) {
+                    MyShopping.scan(this);
+                } else {
+                    askKey(getParentActivity(), this::updateSummarizeBar);
+                }
+            });
+            return;
+        }
         summarizeButton.setText(hasKey ? "✦  Summarize" : "Set OpenAI API key");
         boolean enabled = !hasKey || !pickedChats.isEmpty();
         summarizeButton.setEnabled(enabled);
@@ -681,10 +754,6 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
             items.add(UItem.asShadow("The digest uses your own OpenAI key. It's stored only on this phone; change it later in Tegram's settings."));
         }
         updateSummarizeBar();
-
-        items.add(UItem.asShadow(null));
-        items.add(UItem.asCustom(MyShopping.createCard(this, () -> listView.adapter.update(true))));
-        items.add(UItem.asShadow("Reads one chat's last days and lists what someone asked to buy."));
 
         Digest last = Digest.load();
         if (last != null) {
