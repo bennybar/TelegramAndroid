@@ -148,6 +148,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
 
     // A finished digest, kept so it can be reopened without fetching or paying again.
     public static class Digest {
+        String label; // set for a catch-up (MyMutedCatchUp); null for a digest
         int minutes;
         long time;
         int posts;
@@ -165,6 +166,10 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         }
 
         void save() {
+            save("lastDigest");
+        }
+
+        void save(String key) {
             try {
                 JSONArray refsJson = new JSONArray();
                 for (AiSummarizer.Ref ref : refs) {
@@ -173,20 +178,28 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
                 JSONObject json = new JSONObject()
                     .put("minutes", minutes).put("time", time).put("posts", posts)
                     .put("truncated", truncated).put("coveredSince", coveredSince).put("text", text).put("refs", refsJson);
-                AiSummarizer.prefs().edit().putString("lastDigest", json.toString()).apply();
+                if (label != null) {
+                    json.put("label", label);
+                }
+                AiSummarizer.prefs().edit().putString(key, json.toString()).apply();
             } catch (Exception e) {
                 FileLog.e(e);
             }
         }
 
         static Digest load() {
-            String raw = AiSummarizer.prefs().getString("lastDigest", null);
+            return load("lastDigest");
+        }
+
+        static Digest load(String key) {
+            String raw = AiSummarizer.prefs().getString(key, null);
             if (raw == null) {
                 return null;
             }
             try {
                 JSONObject json = new JSONObject(raw);
                 Digest d = new Digest();
+                d.label = json.has("label") ? json.getString("label") : null;
                 d.minutes = json.getInt("minutes");
                 d.time = json.getLong("time");
                 d.posts = json.getInt("posts");
@@ -229,51 +242,60 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         }
     }
 
-    // The two pages, switched by the pill under the top bar.
+    // The pages, switched by the pill row under the top bar: Digest, the four lists (MyLists), Catch-up.
     public static final int PAGE_DIGEST = 0;
-    public static final int PAGE_SHOPPING = 1;
+    public static final int PAGE_LISTS = 1; // 1..4: Shopping, Tasks, Dates, Kids
+    public static final int PAGE_CATCHUP = 5;
+    private static final String[] PAGE_NAMES = {"✦ Digest", "🛒 Shop", "✅ Tasks", "📅 Dates", "🎒 Kids", "⏪ Catch-up"};
+    private static final String[] PAGE_TITLES = {"Digest", "Shopping list", "Tasks", "Dates", "Kids", "Catch-up"};
     private static final int SWITCH_DP = 52;
     private int page = AiSummarizer.prefs().getInt("aiPage", PAGE_DIGEST);
-    private MyShopping.Page shoppingPage;
-    private final TextView[] switchTabs = new TextView[2];
+    private final View[] pageViews = new View[PAGE_NAMES.length];
+    private final TextView[] switchTabs = new TextView[PAGE_NAMES.length];
+    private android.widget.HorizontalScrollView switchScroll;
 
-    // A two-segment pill: Digest | Shopping.
+    // A scrollable row of pills, the chosen one filled.
     private View createPageSwitch(Context context) {
-        LinearLayout pill = new LinearLayout(context);
-        pill.setOrientation(LinearLayout.HORIZONTAL);
-        pill.setPadding(AndroidUtilities.dp(3), AndroidUtilities.dp(3), AndroidUtilities.dp(3), AndroidUtilities.dp(3));
-        pill.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(20), Theme.getColor(Theme.key_windowBackgroundWhite)));
-        String[] names = {"✦  Digest", "🛒  Shopping"};
-        for (int i = 0; i < 2; i++) {
+        LinearLayout row = new LinearLayout(context);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(AndroidUtilities.dp(12), 0, AndroidUtilities.dp(12), 0);
+        for (int i = 0; i < PAGE_NAMES.length; i++) {
             TextView tab = new TextView(context);
-            tab.setText(names[i]);
+            tab.setText(PAGE_NAMES[i]);
             tab.setGravity(Gravity.CENTER);
             tab.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
             tab.setTypeface(AndroidUtilities.bold());
             tab.setIncludeFontPadding(false);
+            tab.setPadding(AndroidUtilities.dp(14), 0, AndroidUtilities.dp(14), 0);
             int index = i;
             tab.setOnClickListener(v -> showPage(index));
             switchTabs[i] = tab;
-            pill.addView(tab, LayoutHelper.createLinear(0, 34, 1f));
+            row.addView(tab, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, 36, 0, 0, 6, 0));
         }
-        FrameLayout wrap = new FrameLayout(context);
-        wrap.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray));
-        wrap.addView(pill, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 40, Gravity.CENTER, 16, 0, 16, 0));
-        return wrap;
+        switchScroll = new android.widget.HorizontalScrollView(context);
+        switchScroll.setHorizontalScrollBarEnabled(false);
+        switchScroll.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundGray));
+        switchScroll.addView(row, new FrameLayout.LayoutParams(LayoutHelper.WRAP_CONTENT, LayoutHelper.MATCH_PARENT));
+        return switchScroll;
     }
 
     private void showPage(int index) {
-        page = index;
-        AiSummarizer.prefs().edit().putInt("aiPage", index).apply();
+        page = Math.max(0, Math.min(PAGE_NAMES.length - 1, index));
+        AiSummarizer.prefs().edit().putInt("aiPage", page).apply();
         int accent = Theme.getColor(Theme.key_featuredStickers_addButton);
-        for (int i = 0; i < 2; i++) {
-            boolean selected = i == index;
-            switchTabs[i].setTextColor(selected ? Theme.getColor(Theme.key_featuredStickers_buttonText) : Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
-            switchTabs[i].setBackground(selected ? Theme.createRoundRectDrawable(AndroidUtilities.dp(17), accent) : null);
+        for (int i = 0; i < PAGE_NAMES.length; i++) {
+            boolean selected = i == page;
+            switchTabs[i].setTextColor(selected ? Theme.getColor(Theme.key_featuredStickers_buttonText) : accent);
+            switchTabs[i].setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(18), selected ? accent : Theme.multAlpha(accent, 0.1f)));
+            pageViews[i].setVisibility(selected ? View.VISIBLE : View.GONE);
         }
-        listView.setVisibility(index == PAGE_DIGEST ? View.VISIBLE : View.GONE);
-        shoppingPage.setVisibility(index == PAGE_SHOPPING ? View.VISIBLE : View.GONE);
-        actionBar.setTitle(index == PAGE_DIGEST ? "Digest" : "Shopping list");
+        TextView selectedTab = switchTabs[page];
+        switchScroll.post(() -> switchScroll.smoothScrollTo(Math.max(0, selectedTab.getLeft() - AndroidUtilities.dp(40)), 0));
+        actionBar.setTitle(PAGE_TITLES[page]);
+        if (page == PAGE_CATCHUP) {
+            ((MyMutedCatchUp.Page) pageViews[PAGE_CATCHUP]).rebuild(); // unread counts change while away
+        }
         updateSummarizeBar();
     }
 
@@ -323,9 +345,15 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         listView.setClipToPadding(false);
         frameLayout.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
-        shoppingPage = new MyShopping.Page(this, this::updateSummarizeBar);
-        shoppingPage.setPadding(0, topInset + AndroidUtilities.dp(SWITCH_DP), 0, bottomInset + AndroidUtilities.dp(SUMMARIZE_BAR_DP));
-        frameLayout.addView(shoppingPage, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+        pageViews[PAGE_DIGEST] = listView;
+        for (int i = 0; i < MyLists.KINDS.length; i++) {
+            pageViews[PAGE_LISTS + i] = MyLists.createPage(this, i, this::updateSummarizeBar);
+        }
+        pageViews[PAGE_CATCHUP] = new MyMutedCatchUp.Page(this, this::updateSummarizeBar);
+        for (int i = 1; i < pageViews.length; i++) {
+            pageViews[i].setPadding(0, topInset + AndroidUtilities.dp(SWITCH_DP), 0, bottomInset + AndroidUtilities.dp(SUMMARIZE_BAR_DP));
+            frameLayout.addView(pageViews[i], LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
+        }
 
         FrameLayout.LayoutParams switchParams = LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, SWITCH_DP, Gravity.TOP);
         switchParams.topMargin = topInset;
@@ -351,18 +379,30 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
 
     // The pinned button: Summarize, or "Set OpenAI API key" until there is one.
     private void updateSummarizeBar() {
-        if (summarizeButton == null || shoppingPage == null) {
+        if (summarizeButton == null || pageViews[pageViews.length - 1] == null) {
             return;
         }
         boolean hasKey = !AiSummarizer.prefs().getString("apiKey", "").isEmpty();
-        if (page == PAGE_SHOPPING) {
-            boolean scanning = MyShopping.isScanning();
-            summarizeButton.setText(!hasKey ? "Set OpenAI API key" : scanning ? "Scanning…" : "🛒  Scan for items");
-            summarizeButton.setEnabled(!scanning);
-            summarizeButton.setAlpha(scanning ? 0.5f : 1f);
+        if (page != PAGE_DIGEST) {
+            boolean busy;
+            String label;
+            Runnable action;
+            if (page == PAGE_CATCHUP) {
+                busy = MyMutedCatchUp.isRunning();
+                label = busy ? "Catching up…" : MyMutedCatchUp.buttonLabel();
+                action = () -> MyMutedCatchUp.runAll(this);
+            } else {
+                int kind = page - PAGE_LISTS;
+                busy = MyLists.isScanning(kind);
+                label = busy ? "Scanning…" : MyLists.scanLabel(kind);
+                action = () -> MyLists.scan(this, kind);
+            }
+            summarizeButton.setText(!hasKey ? "Set OpenAI API key" : label);
+            summarizeButton.setEnabled(!busy);
+            summarizeButton.setAlpha(busy ? 0.5f : 1f);
             summarizeButton.setOnClickListener(v -> {
                 if (hasKey) {
-                    MyShopping.scan(this);
+                    action.run();
                 } else {
                     askKey(getParentActivity(), this::updateSummarizeBar);
                 }
@@ -1102,15 +1142,16 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
 
         private final Digest digest;
 
-        ResultActivity(Digest digest) {
+        public ResultActivity(Digest digest) {
             this.digest = digest;
         }
 
         @Override
         public View createView(Context context) {
             actionBar.setBackButtonImage(R.drawable.ic_ab_back);
-            actionBar.setTitle("Digest");
-            String share = "Digest · last " + windowLabel(digest.minutes) + " · " + whenText(digest.time) + "\n\n" + plainText(digest.text);
+            actionBar.setTitle(digest.label != null ? "Catch-up" : "Digest");
+            String heading = digest.label != null ? digest.label : "Digest · last " + windowLabel(digest.minutes);
+            String share = heading + " · " + whenText(digest.time) + "\n\n" + plainText(digest.text);
             actionBar.createMenu().addItem(3, R.drawable.msg_markread).setContentDescription("Mark as read");
             actionBar.createMenu().addItem(1, R.drawable.msg_copy);
             actionBar.createMenu().addItem(2, R.drawable.msg_share);
@@ -1144,12 +1185,12 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
             scroll.addView(column, LayoutHelper.createScroll(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.TOP));
             frame.addView(scroll, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
 
-            column.addView(sectionLabel(context, ("Digest of the last " + windowLabel(digest.minutes)).toUpperCase(Locale.US)),
+            column.addView(sectionLabel(context, (digest.label != null ? digest.label : "Digest of the last " + windowLabel(digest.minutes)).toUpperCase(Locale.US)),
                 LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 18, 16, 18, 0));
 
             int chats = digest.chatCount();
             TextView meta = new TextView(context);
-            meta.setText(whenText(digest.time) + " · " + chats + (chats == 1 ? " chat" : " chats") + " · " + digest.posts + " posts");
+            meta.setText(whenText(digest.time) + " · " + chats + (chats == 1 ? " chat" : " chats") + " · " + digest.posts + (digest.label != null ? " messages" : " posts"));
             meta.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
             meta.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
             column.addView(meta, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, 18, 2, 18, 0));
@@ -1157,7 +1198,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
             if (digest.truncated && digest.coveredSince > 0) {
                 TextView warn = new TextView(context);
                 int amber = 0xFFB26A00;
-                warn.setText("Busy window: covers from " + new SimpleDateFormat("HH:mm", Locale.US).format(new Date(digest.coveredSince * 1000L)) + ". Older posts didn't fit.");
+                warn.setText(digest.label != null ? "Busy chats: only their newest unread messages were read." : "Busy window: covers from " + new SimpleDateFormat("HH:mm", Locale.US).format(new Date(digest.coveredSince * 1000L)) + ". Older posts didn't fit.");
                 warn.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 12);
                 warn.setTextColor(amber);
                 warn.setBackground(Theme.createRoundRectDrawable(AndroidUtilities.dp(10), Theme.multAlpha(amber, 0.12f)));
@@ -1168,7 +1209,7 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
             column.addView(summaryText(context, digest.text, digest.refs, ref -> openMessage(this, ref)), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
             TextView disclaimer = new TextView(context);
-            disclaimer.setText("ⓘ Written by a language model from the posts' own text. Early reports are often unverified.");
+            disclaimer.setText(digest.label != null ? "ⓘ Written by a language model from the messages' own text." : "ⓘ Written by a language model from the posts' own text. Early reports are often unverified.");
             disclaimer.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 11.5f);
             disclaimer.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteGrayText));
             column.addView(disclaimer, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, 18, 0, 18, 8));
