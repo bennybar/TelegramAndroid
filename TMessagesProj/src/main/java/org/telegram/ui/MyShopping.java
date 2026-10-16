@@ -213,25 +213,47 @@ public class MyShopping {
                 }
                 content.addView(list);
                 content.addView(hint(context, "Tap an item to check it off. Long-press to open the message it came from."));
-                TextView clearAll = new TextView(context);
-                clearAll.setText("Clear the whole list");
-                clearAll.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
-                clearAll.setTextColor(Theme.getColor(Theme.key_text_RedRegular));
-                clearAll.setPadding(AndroidUtilities.dp(21), AndroidUtilities.dp(4), AndroidUtilities.dp(21), AndroidUtilities.dp(16));
-                clearAll.setOnClickListener(v -> {
-                    AlertDialog.Builder builder = new AlertDialog.Builder(context);
-                    builder.setTitle("Clear the shopping list?");
-                    builder.setMessage("All " + items.size() + " items will be removed.");
-                    builder.setPositiveButton("Clear", (d, w) -> {
-                        save(new ArrayList<>());
-                        rebuild();
-                    });
-                    builder.setNegativeButton("Cancel", null);
-                    fragment.showDialog(builder.create());
-                });
-                content.addView(clearAll);
+            }
+            if (!items.isEmpty() || AiSummarizer.prefs().getLong("shopLastScan", 0) != 0) {
+                content.addView(startOver(context, items.size()));
             }
             onScanStateChanged.run();
+        }
+
+        // Clears the list and the scan history, then (optionally) scans the chosen chat again from scratch.
+        private View startOver(Context context, int count) {
+            TextView button = new TextView(context);
+            button.setText("Start over");
+            button.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
+            button.setTextColor(Theme.getColor(Theme.key_text_RedRegular));
+            button.setPadding(AndroidUtilities.dp(21), AndroidUtilities.dp(4), AndroidUtilities.dp(21), AndroidUtilities.dp(16));
+            button.setOnClickListener(v -> {
+                if (scanning) {
+                    return;
+                }
+                AlertDialog.Builder builder = new AlertDialog.Builder(context);
+                builder.setTitle("Start over?");
+                builder.setMessage((count > 0 ? "Removes all " + count + " items and the scan history." : "Removes the scan history.") +
+                    (chat() != 0 ? " Scan " + AiSummarizer.chatTitle(fragment.getCurrentAccount(), chat()) + " again now?" : ""));
+                builder.setPositiveButton(chat() != 0 ? "Clear & scan" : "Clear", (d, w) -> {
+                    clearAll();
+                    if (chat() != 0) {
+                        scan(fragment);
+                    }
+                });
+                if (chat() != 0) {
+                    builder.setNeutralButton("Just clear", (d, w) -> clearAll());
+                }
+                builder.setNegativeButton("Cancel", null);
+                fragment.showDialog(builder.create());
+            });
+            return button;
+        }
+
+        private void clearAll() {
+            save(new ArrayList<>());
+            AiSummarizer.prefs().edit().remove("shopLastScan").remove("shopLastResult").apply();
+            rebuild();
         }
 
         private LinearLayout card(Context context) {
