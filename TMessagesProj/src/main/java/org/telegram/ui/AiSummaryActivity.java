@@ -682,6 +682,10 @@ public class AiSummaryActivity extends BaseFragment implements MainTabsActivity.
         }
         updateSummarizeBar();
 
+        items.add(UItem.asShadow(null));
+        items.add(UItem.asCustom(MyShopping.createCard(this, () -> listView.adapter.update(true))));
+        items.add(UItem.asShadow("Reads one chat's last days and lists what someone asked to buy."));
+
         Digest last = Digest.load();
         if (last != null) {
             items.add(UItem.asShadow(null));

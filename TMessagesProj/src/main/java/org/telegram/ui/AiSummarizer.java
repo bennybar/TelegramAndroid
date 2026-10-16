@@ -287,6 +287,18 @@ public class AiSummarizer {
         });
     }
 
+    // The collected messages as one text, oldest to newest per chat, keeping the newest maxChars
+    // (MyShopping reads it with its own prompt instead of send()).
+    public String transcript(int maxChars) {
+        StringBuilder all = new StringBuilder();
+        for (StringBuilder text : chatTexts) {
+            if (text != null) {
+                all.append(text);
+            }
+        }
+        return all.length() > maxChars ? all.substring(all.length() - maxChars) : all.toString();
+    }
+
     // Only collect messages newer than this id (e.g. the chat's last read message).
     public void setMinMessageId(int minMessageId) {
         this.minMessageId = minMessageId;
