@@ -9,6 +9,9 @@
 //   PUT  /<url>            Simple Push leg, correlated against a recent POST
 //   POST /fcm/<token>      same fold, VAPID-signed, forwarded to FCM
 //   PUT  /fcm/<token>      Simple Push leg of the FCM route
+//   POST /apns/<sandbox|production>/<device token>
+//                          Tegram iOS: the WebPush still encrypted, as an APNs
+//                          alert the app's notification extension decrypts
 //
 // Requests are accepted only from the Telegram server ranges published at
 // core.telegram.org/resources/cidr.txt; that gate replaces the nginx ACL the
@@ -249,6 +252,103 @@ async function vapidAuthorization(env) {
   return vapidJwt.header;
 }
 
+// -- APNs (Tegram iOS) -------------------------------------------------------
+
+// Telegram only pushes through APNs for its own apps, so Tegram iOS registers a
+// WebPush subscription pointing here. The body stays encrypted with the keys the
+// phone generated; it rides along in the APNs payload ("wp") and the app's
+// Notification Service Extension decrypts it. Secrets: APNS_KEY (the .p8 PEM),
+// APNS_KEY_ID, APNS_TEAM_ID, APNS_TOPIC (the bundle ID).
+
+const APNS_HOSTS = {
+  sandbox: "https://api.sandbox.push.apple.com",
+  production: "https://api.push.apple.com",
+};
+// APNs refuses provider tokens older than an hour, and newer than 20 minutes
+// apart is throttled; re-sign every 40.
+const APNS_JWT_LIFETIME_SECS = 40 * 60;
+// APNs answers 413 above this.
+const MAX_APNS_PAYLOAD = 4096;
+
+let apnsKey = null; // CryptoKey
+let apnsJwt = null; // { token, iat }
+
+async function apnsAuthorization(env) {
+  const pem = (env.APNS_KEY ?? "").trim();
+  if (!pem || !env.APNS_KEY_ID || !env.APNS_TEAM_ID || !env.APNS_TOPIC) return null;
+  if (!apnsKey) {
+    try {
+      const der = Uint8Array.from(
+        atob(pem.replace(/-----[^-]+-----/g, "").replace(/\s+/g, "")),
+        (c) => c.charCodeAt(0),
+      );
+      apnsKey = await crypto.subtle.importKey(
+        "pkcs8", der, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"],
+      );
+    } catch (e) {
+      console.error(`APNS_KEY rejected: ${e}`);
+      return null;
+    }
+  }
+  const now = Math.floor(Date.now() / 1000);
+  if (apnsJwt && apnsJwt.iat > now - APNS_JWT_LIFETIME_SECS) return apnsJwt.token;
+  const enc = (value) => b64urlEncode(new TextEncoder().encode(JSON.stringify(value)));
+  const signingInput = `${enc({ alg: "ES256", kid: env.APNS_KEY_ID })}.${enc({ iss: env.APNS_TEAM_ID, iat: now })}`;
+  const signature = await crypto.subtle.sign(
+    { name: "ECDSA", hash: "SHA-256" }, apnsKey, new TextEncoder().encode(signingInput),
+  );
+  apnsJwt = { token: `bearer ${signingInput}.${b64urlEncode(new Uint8Array(signature))}`, iat: now };
+  return apnsJwt.token;
+}
+
+// The APNs payload: a generic alert the extension replaces, plus the encrypted
+// WebPush. One too big for APNs goes without it; the extension then shows the
+// generic text rather than nothing.
+export function apnsPayload(encryption, cryptoKey, body) {
+  let binary = "";
+  for (const byte of body) binary += String.fromCharCode(byte);
+  const aps = { alert: { title: "Tegram", body: "New message" }, sound: "default", "mutable-content": 1 };
+  const full = JSON.stringify({ aps, wp: { e: encryption, k: cryptoKey, b: btoa(binary) } });
+  if (full.length <= MAX_APNS_PAYLOAD) return full;
+  console.warn(`apns payload is ${full.length} bytes (limit ${MAX_APNS_PAYLOAD}), sending the generic alert`);
+  return JSON.stringify({ aps });
+}
+
+async function apnsPush(env, environment, token, request) {
+  const host = APNS_HOSTS[environment];
+  if (!host || !/^[0-9a-fA-F]{64,200}$/.test(token)) return new Response(null, { status: 403 });
+  const auth = await apnsAuthorization(env);
+  if (!auth) {
+    console.warn("apns request refused: APNS_* secrets are not configured");
+    return new Response(null, { status: 503 });
+  }
+  const body = new Uint8Array(await request.arrayBuffer());
+  let upstream;
+  try {
+    upstream = await fetch(`${host}/3/device/${token}`, {
+      method: "POST",
+      headers: {
+        authorization: auth,
+        "apns-topic": env.APNS_TOPIC,
+        "apns-push-type": "alert",
+        "apns-priority": "10",
+      },
+      body: apnsPayload(request.headers.get("Encryption") ?? "", request.headers.get("Crypto-Key") ?? "", body),
+      signal: AbortSignal.timeout(FORWARD_TIMEOUT_MS),
+    });
+  } catch (e) {
+    console.error(`apns forward error: ${e}`);
+    return new Response(null, { status: 500 });
+  }
+  if (!upstream.ok) {
+    const reason = await upstream.text();
+    console.warn(`apns rejected: status=${upstream.status} ${reason}`);
+    // A token APNs no longer knows is a dead subscription: 410 makes Telegram drop it.
+    return new Response(null, { status: upstream.status === 410 || /BadDeviceToken|Unregistered/.test(reason) ? 410 : upstream.status });
+  }
+  return new Response(null, { status: 201, headers: { Location: request.url } });
+}
+
 // -- endpoints ----------------------------------------------------------------
 
 // decodeURIComponent throws on a malformed escape ("%zz"); a request that cannot
@@ -407,6 +507,7 @@ async function fcmTarget(env, token) {
 function routeName(request) {
   const path = new URL(request.url).pathname;
   if (path.startsWith("/fcm/")) return `fcm-${request.method.toLowerCase()}`;
+  if (path.startsWith("/apns/")) return "apns";
   if (path === "/aesgcm") return "aesgcm";
   return request.method === "PUT" ? "put" : "other";
 }
@@ -466,6 +567,14 @@ async function handle(request, env) {
         body,
       );
       return postAndRecord(endpoint, clampFcmPayload(endpoint, folded), auth);
+    }
+
+    if (url.pathname.startsWith("/apns/")) {
+      const [, , environment, token] = url.pathname.split("/");
+      // Only the POST carries the message; a Simple Push PUT would be a second, empty alert.
+      if (request.method === "PUT") return new Response(null, { status: 200 });
+      if (request.method !== "POST") return new Response(null, { status: 405 });
+      return apnsPush(env, environment, token ?? "", request);
     }
 
     if (request.method === "POST" && url.pathname === "/aesgcm") {
