@@ -302,14 +302,29 @@ async function apnsAuthorization(env) {
 }
 
 // The APNs payload: a generic alert the extension replaces, plus the encrypted
-// WebPush. One too big for APNs goes without it; the extension then shows the
+// WebPush. Telegram pads its records at the front past APNs' limit, so a big one
+// goes as its first block (h, for the padding length) and its end from byte o on
+// (b, with the tag); AES-GCM is counter mode, so the extension can decrypt that
+// end alone. One still too big goes without it; the extension then shows the
 // generic text rather than nothing.
 export function apnsPayload(encryption, cryptoKey, body) {
-  let binary = "";
-  for (const byte of body) binary += String.fromCharCode(byte);
+  const base64 = (bytes) => {
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary);
+  };
   const aps = { alert: { title: "Tegram", body: "New message" }, sound: "default", "mutable-content": 1 };
-  const full = JSON.stringify({ aps, wp: { e: encryption, k: cryptoKey, b: btoa(binary) } });
+  const full = JSON.stringify({ aps, wp: { e: encryption, k: cryptoKey, b: base64(body) } });
   if (full.length <= MAX_APNS_PAYLOAD) return full;
+  // Each dropped 3 bytes save 4 characters; 64 more for h and o.
+  const offset = Math.ceil((((full.length - MAX_APNS_PAYLOAD + 64) * 3) / 4) / 16) * 16;
+  if (offset + 16 < body.length) {
+    const trimmed = JSON.stringify({
+      aps,
+      wp: { e: encryption, k: cryptoKey, h: base64(body.subarray(0, 16)), o: offset, b: base64(body.subarray(offset)) },
+    });
+    if (trimmed.length <= MAX_APNS_PAYLOAD) return trimmed;
+  }
   console.warn(`apns payload is ${full.length} bytes (limit ${MAX_APNS_PAYLOAD}), sending the generic alert`);
   return JSON.stringify({ aps });
 }
