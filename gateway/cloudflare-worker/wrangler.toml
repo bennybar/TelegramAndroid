@@ -10,3 +10,12 @@ compatibility_date = "2026-06-01"
 # instead of only live via `wrangler tail`.
 [observability]
 enabled = true
+
+# A trimmed push's whole encrypted record, kept a few minutes for the phone (see PushBody).
+[[durable_objects.bindings]]
+name = "PUSH_BODY"
+class_name = "PushBody"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PushBody"]

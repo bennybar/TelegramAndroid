@@ -12,6 +12,9 @@
 //   POST /apns/<sandbox|production>/<device token>
 //                          Tegram iOS: the WebPush still encrypted, as an APNs
 //                          alert the app's notification extension decrypts
+//   GET  /apns-body/<id>   Tegram iOS: the whole encrypted record of a trimmed push
+//                          whose text didn't survive the trim (open to the phone,
+//                          so before the Telegram range gate; the id is random)
 //
 // Requests are accepted only from the Telegram server ranges published at
 // core.telegram.org/resources/cidr.txt; that gate replaces the nginx ACL the
@@ -269,6 +272,8 @@ const APNS_HOSTS = {
 const APNS_JWT_LIFETIME_SECS = 40 * 60;
 // APNs answers 413 above this.
 const MAX_APNS_PAYLOAD = 4096;
+// A trimmed push's whole record stays this long, in case the phone has to fetch it.
+const APNS_BODY_TTL_MS = 10 * 60 * 1000;
 
 let apnsKey = null; // CryptoKey
 let apnsJwt = null; // { token, iat }
@@ -305,9 +310,10 @@ async function apnsAuthorization(env) {
 // WebPush. Telegram pads its records at the front past APNs' limit, so a big one
 // goes as its first block (h, for the padding length) and its end from byte o on
 // (b, with the tag); AES-GCM is counter mode, so the extension can decrypt that
-// end alone. One still too big goes without it; the extension then shows the
-// generic text rather than nothing.
-export function apnsPayload(encryption, cryptoKey, body) {
+// end alone. A long message's text starts before that end, so a trimmed push also
+// names (u) its whole record stored here, which the extension then fetches. One
+// still too big carries only that name.
+export function apnsPayload(encryption, cryptoKey, body, bodyId) {
   const base64 = (bytes) => {
     let binary = "";
     for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -316,17 +322,42 @@ export function apnsPayload(encryption, cryptoKey, body) {
   const aps = { alert: { title: "Tegram", body: "New message" }, sound: "default", "mutable-content": 1 };
   const full = JSON.stringify({ aps, wp: { e: encryption, k: cryptoKey, b: base64(body) } });
   if (full.length <= MAX_APNS_PAYLOAD) return full;
-  // Each dropped 3 bytes save 4 characters; 64 more for h and o.
-  const offset = Math.ceil((((full.length - MAX_APNS_PAYLOAD + 64) * 3) / 4) / 16) * 16;
+  // Each dropped 3 bytes save 4 characters; 128 more for h, o and u.
+  const offset = Math.ceil((((full.length - MAX_APNS_PAYLOAD + 128) * 3) / 4) / 16) * 16;
   if (offset + 16 < body.length) {
     const trimmed = JSON.stringify({
       aps,
-      wp: { e: encryption, k: cryptoKey, h: base64(body.subarray(0, 16)), o: offset, b: base64(body.subarray(offset)) },
+      wp: { e: encryption, k: cryptoKey, u: bodyId, h: base64(body.subarray(0, 16)), o: offset, b: base64(body.subarray(offset)) },
     });
     if (trimmed.length <= MAX_APNS_PAYLOAD) return trimmed;
   }
-  console.warn(`apns payload is ${full.length} bytes (limit ${MAX_APNS_PAYLOAD}), sending the generic alert`);
-  return JSON.stringify({ aps });
+  console.warn(`apns payload is ${full.length} bytes (limit ${MAX_APNS_PAYLOAD}), sending only its name`);
+  return JSON.stringify({ aps, wp: { e: encryption, k: cryptoKey, u: bodyId } });
+}
+
+// One object per stored record, deleted by its alarm.
+export class PushBody {
+  constructor(state) {
+    this.storage = state.storage;
+  }
+
+  async fetch(request) {
+    if (request.method === "PUT") {
+      await this.storage.put("body", new Uint8Array(await request.arrayBuffer()));
+      await this.storage.setAlarm(Date.now() + APNS_BODY_TTL_MS);
+      return new Response(null, { status: 201 });
+    }
+    const body = await this.storage.get("body");
+    return body ? new Response(body) : new Response(null, { status: 404 });
+  }
+
+  async alarm() {
+    await this.storage.deleteAll();
+  }
+}
+
+function pushBodyStub(env, id) {
+  return env.PUSH_BODY.get(env.PUSH_BODY.idFromName(id));
 }
 
 async function apnsPush(env, environment, token, request) {
@@ -338,6 +369,15 @@ async function apnsPush(env, environment, token, request) {
     return new Response(null, { status: 503 });
   }
   const body = new Uint8Array(await request.arrayBuffer());
+  const bodyId = crypto.randomUUID();
+  const payload = apnsPayload(request.headers.get("Encryption") ?? "", request.headers.get("Crypto-Key") ?? "", body, bodyId);
+  if (payload.includes(bodyId)) {
+    try {
+      await pushBodyStub(env, bodyId).fetch("https://push-body/", { method: "PUT", body });
+    } catch (e) {
+      console.warn(`apns body not stored: ${e}`);
+    }
+  }
   let upstream;
   try {
     upstream = await fetch(`${host}/3/device/${token}`, {
@@ -348,7 +388,7 @@ async function apnsPush(env, environment, token, request) {
         "apns-push-type": "alert",
         "apns-priority": "10",
       },
-      body: apnsPayload(request.headers.get("Encryption") ?? "", request.headers.get("Crypto-Key") ?? "", body),
+      body: payload,
       signal: AbortSignal.timeout(FORWARD_TIMEOUT_MS),
     });
   } catch (e) {
@@ -523,6 +563,7 @@ function routeName(request) {
   const path = new URL(request.url).pathname;
   if (path.startsWith("/fcm/")) return `fcm-${request.method.toLowerCase()}`;
   if (path.startsWith("/apns/")) return "apns";
+  if (path.startsWith("/apns-body/")) return "apns-body";
   if (path === "/aesgcm") return "aesgcm";
   return request.method === "PUT" ? "put" : "other";
 }
@@ -550,6 +591,11 @@ export default {
 };
 
 async function handle(request, env) {
+  const bodyId = new URL(request.url).pathname.match(/^\/apns-body\/([0-9a-f-]{36})$/)?.[1];
+  if (bodyId) {
+    if (request.method !== "GET") return new Response(null, { status: 405 });
+    return pushBodyStub(env, bodyId).fetch("https://push-body/");
+  }
   {
     const clientIp = request.headers.get("CF-Connecting-IP");
     if (!clientIp) return new Response("Missing client IP", { status: 400 });
